@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>teaWords - 茶词翻译</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "surface": "#f8f9fa",
+                "tertiary-fixed": "#dce2f3",
+                "tertiary": "#000000",
+                "secondary-fixed-dim": "#adc6ff",
+                "surface-container-high": "#e7e8e9",
+                "on-primary-fixed": "#141b2b",
+                "on-primary-fixed-variant": "#404758",
+                "secondary-container": "#2170e4",
+                "inverse-surface": "#2e3132",
+                "on-tertiary-fixed": "#151c27",
+                "secondary-fixed": "#d8e2ff",
+                "error-container": "#ffdad6",
+                "surface-container-low": "#f3f4f5",
+                "inverse-primary": "#c0c6db",
+                "on-secondary-container": "#fefcff",
+                "on-background": "#191c1d",
+                "surface-dim": "#d9dadb",
+                "surface-tint": "#575e70",
+                "error": "#ba1a1a",
+                "secondary": "#0058be",
+                "on-secondary-fixed-variant": "#004395",
+                "primary-fixed": "#dce2f7",
+                "on-surface": "#191c1d",
+                "surface-bright": "#f8f9fa",
+                "primary": "#000000",
+                "background": "#f8f9fa",
+                "surface-container": "#edeeef",
+                "surface-container-lowest": "#ffffff",
+                "on-secondary-fixed": "#001a42",
+                "on-tertiary-container": "#7d8492",
+                "surface-variant": "#e1e3e4",
+                "on-tertiary": "#ffffff",
+                "on-primary": "#ffffff",
+                "on-primary-container": "#7d8497",
+                "on-secondary": "#ffffff",
+                "on-surface-variant": "#45464c",
+                "tertiary-container": "#151c27",
+                "primary-container": "#141b2b",
+                "surface-container-highest": "#e1e3e4",
+                "tertiary-fixed-dim": "#c0c7d6",
+                "on-error": "#ffffff",
+                "on-error-container": "#93000a",
+                "outline": "#76777d",
+                "on-tertiary-fixed-variant": "#404754",
+                "inverse-on-surface": "#f0f1f2",
+                "outline-variant": "#c6c6cd",
+                "primary-fixed-dim": "#c0c6db"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+            },
+            "spacing": {
+                "md": "16px",
+                "sm": "12px",
+                "base": "4px",
+                "xs": "8px",
+                "gutter-mobile": "12px",
+                "xl": "32px",
+                "lg": "24px",
+                "margin-mobile": "24px"
+            },
+            "fontFamily": {
+                "headline-lg": ["Inter"],
+                "display-lg": ["Inter"],
+                "body-lg": ["Inter"],
+                "body-md": ["Inter"],
+                "headline-md": ["Inter"],
+                "label-md": ["Inter"],
+                "label-sm": ["Inter"]
+            },
+            "fontSize": {
+                "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                "headline-md-mobile": ["20px", {"lineHeight": "28px", "fontWeight": "700"}],
+                "label-sm-mobile": ["11px", {"lineHeight": "16px", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; vertical-align: middle; }
+        .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
+        body { min-height: 100dvh; display: flex; flex-direction: column; }
+    </style>
+</head>
+<body class="bg-background text-on-background selection:bg-secondary-fixed selection:text-on-secondary-fixed">
+<!-- TopAppBar -->
+<header class="bg-transparent text-on-background fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-margin-mobile h-20 w-full">
+<div class="active:opacity-50 transition-opacity duration-200 cursor-pointer">
+<span class="material-symbols-outlined text-outline">menu</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="font-headline-md-mobile text-on-surface font-semibold tracking-wide lowercase">teawords</div>
+</div>
+<div class="active:opacity-50 transition-opacity duration-200 cursor-pointer">
+<span class="material-symbols-outlined text-outline">account_circle</span>
+</div>
+</header>
+<main class="flex-grow flex flex-col justify-center px-margin-mobile max-w-lg mx-auto w-full pt-20 pb-32">
+<!-- Hero Translation Section -->
+<section class="text-center mb-16 mt-4">
+<h1 class="text-4xl text-primary tracking-tight mb-3 font-medium">茶词</h1>
+<p class="text-outline font-body-md mb-16 tracking-wide">专注翻译，见字如面</p>
+<!-- Lower-Center Search Input for Thumb Access -->
+<div class="relative group w-full max-w-md mx-auto">
+<div class="absolute inset-y-0 left-6 flex items-center pointer-events-none text-outline">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input autofocus="" class="w-full h-14 pl-14 pr-14 bg-surface-container-lowest border border-outline-variant/30 rounded-full text-body-lg focus:ring-1 focus:ring-outline/30 focus:border-outline/50 transition-all duration-300 placeholder:text-outline-variant/70 shadow-sm" placeholder="键入单词或长句..." type="text"/>
+<div class="absolute inset-y-0 right-4 flex items-center">
+<button class="p-2 text-outline hover:text-on-surface transition-colors rounded-full">
+<span class="material-symbols-outlined">mic</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Recent Discovery / History -->
+<section class="mt-8 px-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-label-md text-outline uppercase tracking-widest text-xs">最近查阅</h2>
+<button class="text-xs text-outline hover:text-on-surface transition-colors tracking-wide">清空</button>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center justify-between py-4 border-b border-outline-variant/20 active:opacity-50 transition-opacity cursor-pointer group">
+<div class="flex flex-col">
+<span class="font-medium text-body-md text-on-surface group-hover:text-primary transition-colors">Ephemeral</span>
+<span class="text-sm text-outline mt-1">短暂的，转瞬即逝的</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-outline transition-colors">arrow_forward</span>
+</div>
+<div class="flex items-center justify-between py-4 border-b border-outline-variant/20 active:opacity-50 transition-opacity cursor-pointer group">
+<div class="flex flex-col">
+<span class="font-medium text-body-md text-on-surface group-hover:text-primary transition-colors">Serendipity</span>
+<span class="text-sm text-outline mt-1">不期而遇的美好</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-outline transition-colors">arrow_forward</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 right-0 w-full z-50 flex justify-around items-center px-4 py-4 pb-safe bg-background/90 backdrop-blur-xl border-t border-outline-variant/10">
+<button class="flex flex-col items-center justify-center text-primary font-medium active:scale-[0.98] transition-all duration-200 w-16">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">translate</span>
+<span class="text-[10px] tracking-wide">翻译</span>
+</button>
+<button class="flex flex-col items-center justify-center text-outline hover:text-on-surface active:scale-[0.98] transition-all duration-200 w-16">
+<span class="material-symbols-outlined mb-1">history</span>
+<span class="text-[10px] tracking-wide">记录</span>
+</button>
+<button class="flex flex-col items-center justify-center text-outline hover:text-on-surface active:scale-[0.98] transition-all duration-200 w-16">
+<span class="material-symbols-outlined mb-1">settings</span>
+<span class="text-[10px] tracking-wide">设置</span>
+</button>
+</nav>
+<script>
+        // Search bar focus interaction
+        const searchInput = document.querySelector('input');
+        const searchContainer = searchInput.parentElement;
+
+        searchInput.addEventListener('focus', () => {
+            searchContainer.classList.add('scale-[1.01]');
+        });
+
+        searchInput.addEventListener('blur', () => {
+            searchContainer.classList.remove('scale-[1.01]');
+        });
+
+        // Navigation state simulation
+        const navButtons = document.querySelectorAll('nav button');
+        navButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                navButtons.forEach(b => {
+                    b.className = "flex flex-col items-center justify-center text-outline hover:text-on-surface active:scale-[0.98] transition-all duration-200 w-16";
+                    b.querySelector('span:first-child').style.fontVariationSettings = "'FILL' 0";
+                });
+                btn.className = "flex flex-col items-center justify-center text-primary font-medium active:scale-[0.98] transition-all duration-200 w-16";
+                btn.querySelector('span:first-child').style.fontVariationSettings = "'FILL' 1";
+            });
+        });
+    </script>
+</body></html>

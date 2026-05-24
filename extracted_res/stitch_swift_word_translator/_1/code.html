@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>teaWords - Linguistic</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#575e70",
+                        "on-tertiary-fixed": "#151c27",
+                        "on-secondary-container": "#fefcff",
+                        "on-primary-fixed-variant": "#404758",
+                        "tertiary-container": "#151c27",
+                        "surface-variant": "#e1e3e4",
+                        "surface-dim": "#d9dadb",
+                        "on-surface": "#191c1d",
+                        "on-error": "#ffffff",
+                        "tertiary": "#000000",
+                        "error": "#ba1a1a",
+                        "on-primary-container": "#7d8497",
+                        "on-secondary-fixed": "#001a42",
+                        "inverse-on-surface": "#f0f1f2",
+                        "primary-fixed": "#dce2f7",
+                        "secondary": "#0058be",
+                        "primary-fixed-dim": "#c0c6db",
+                        "surface-container": "#edeeef",
+                        "outline": "#76777d",
+                        "tertiary-fixed-dim": "#c0c7d6",
+                        "primary-container": "#141b2b",
+                        "on-background": "#191c1d",
+                        "on-tertiary-fixed-variant": "#404754",
+                        "inverse-surface": "#2e3132",
+                        "on-surface-variant": "#45464c",
+                        "on-secondary-fixed-variant": "#004395",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-high": "#e7e8e9",
+                        "outline-variant": "#c6c6cd",
+                        "primary": "#000000",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#c0c6db",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-container": "#7d8492",
+                        "surface-container-low": "#f3f4f5",
+                        "on-secondary": "#ffffff",
+                        "surface-container-highest": "#e1e3e4",
+                        "surface-bright": "#f8f9fa",
+                        "tertiary-fixed": "#dce2f3",
+                        "surface": "#f8f9fa",
+                        "on-tertiary": "#ffffff",
+                        "secondary-container": "#2170e4",
+                        "background": "#f8f9fa",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-primary-fixed": "#141b2b",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "32px",
+                        "xs": "8px",
+                        "lg": "24px",
+                        "base": "4px",
+                        "md": "16px",
+                        "sm": "12px",
+                        "gutter-mobile": "12px",
+                        "margin-mobile": "20px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "display-lg-mobile": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-md-mobile": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                        "label-sm-mobile": ["10px", {"lineHeight": "14px", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "body-lg-mobile": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "label-md-mobile": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "body-md-mobile": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-scale:active { transform: scale(0.98); }
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen pb-32 selection:bg-secondary-fixed/50">
+<!-- TopAppBar -->
+<header class="bg-background/90 backdrop-blur-sm text-on-background font-headline-md-mobile text-headline-md-mobile docked full-width top-0 flat no-shadows flex items-center justify-between px-margin-mobile h-16 w-full fixed z-40 border-b border-surface-variant/20">
+<div class="flex items-center gap-xs">
+<button class="active:scale-[0.98] transition-transform duration-200 hover:opacity-70 flex items-center">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-md-mobile text-on-surface font-semibold tracking-tight ml-2">teaWords</h1>
+</div>
+<div class="flex items-center gap-md">
+<button class="active:scale-[0.98] transition-transform duration-200 hover:opacity-70 flex items-center">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="active:scale-[0.98] transition-transform duration-200 hover:opacity-70 flex items-center">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<main class="pt-28 px-margin-mobile max-w-2xl mx-auto">
+<!-- Word Header Section -->
+<section class="mb-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
+<div class="flex flex-col items-start mb-sm">
+<h2 class="font-display-lg-mobile text-[42px] leading-tight text-primary mb-2 font-bold tracking-tight">Linguistic</h2>
+<div class="flex items-center gap-sm mt-1">
+<span class="font-body-lg-mobile text-lg text-on-surface-variant font-light tracking-wide">/lɪŋˈɡwɪstɪk/</span>
+<button class="w-8 h-8 flex items-center justify-center rounded-full text-secondary hover:bg-secondary-fixed/10 active-scale transition-all duration-200">
+<span class="material-symbols-outlined">volume_up</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Definition & Meaning -->
+<section class="mb-10">
+<div class="py-sm">
+<span class="inline-block text-secondary font-label-sm-mobile text-xs mb-3 uppercase tracking-widest font-semibold">Adjective</span>
+<p class="font-headline-md-mobile text-2xl text-on-surface mb-2 font-medium">语言学的</p>
+<p class="font-body-lg-mobile text-lg text-on-surface-variant font-light">Relating to language or linguistics.</p>
+</div>
+</section>
+<!-- Examples Grid (Now Stacked List) -->
+<section class="flex flex-col mb-12">
+<div class="py-md border-t border-surface-variant/30">
+<p class="font-body-lg-mobile text-[17px] leading-relaxed text-on-surface mb-1">Modern <span class="font-semibold">linguistic</span> analysis uses computer technology.</p>
+<p class="font-body-md-mobile text-[15px] text-on-surface-variant/80">现代语言学分析使用计算机技术。</p>
+</div>
+<div class="py-md border-t border-surface-variant/30">
+<p class="font-body-lg-mobile text-[17px] leading-relaxed text-on-surface mb-1">The <span class="font-semibold">linguistic</span> diversity of the region is impressive.</p>
+<p class="font-body-md-mobile text-[15px] text-on-surface-variant/80">该地区的语言多样性令人印象深刻。</p>
+</div>
+<div class="py-md border-t border-surface-variant/30">
+<p class="font-body-lg-mobile text-[17px] leading-relaxed mb-1 italic text-on-surface/90">"Children possess an innate <span class="font-semibold">linguistic</span> ability to learn multiple languages simultaneously."</p>
+<p class="font-body-md-mobile text-[15px] text-on-surface-variant/80">“儿童具有同时学习多种语言的天生语言能力。”</p>
+</div>
+</section>
+<!-- Visual Context Image -->
+<section class="relative h-56 rounded-2xl overflow-hidden mb-12 group">
+<img alt="Academic language study" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjlPkUmlyggM7Ps2JpSy1a1NAqMYrxrYcpGNzQx1G-LMlJ6QTHWaBiZ-J9feI1n9I9Mtbp2uOWqnGkXYxXJ6vZslaGAZ_3LnuhZS63eb9wgkCJn0qfoJWSAdi_4KZaP3e9IEwLUOJH39p7aD2fbrJJ9IXzbgbNwQOFeBuz0gS3adkaBXeV2kKtJWAGWmYIdv2Lxl6RxjD1BYrTJKvB5bEMmhLWfTFaZYG989MfWvxi989E-6OAxt17VZ34PlinjEKGGQLDJ3-8wmc1"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent flex items-end p-lg">
+<p class="text-white/90 font-label-md-mobile text-sm tracking-wide">Visual context: Academic language study</p>
+</div>
+</section>
+<!-- Related Chips -->
+<section class="mb-xl">
+<h3 class="font-label-sm-mobile text-xs text-on-surface-variant/70 mb-4 uppercase tracking-widest font-semibold">Synonyms &amp; Related</h3>
+<div class="flex flex-wrap gap-3">
+<span class="text-on-surface font-body-md-mobile text-[15px] cursor-pointer hover:text-secondary transition-colors">Philological</span>
+<span class="text-on-surface-variant/40 select-none">•</span>
+<span class="text-on-surface font-body-md-mobile text-[15px] cursor-pointer hover:text-secondary transition-colors">Dialectal</span>
+<span class="text-on-surface-variant/40 select-none">•</span>
+<span class="text-on-surface font-body-md-mobile text-[15px] cursor-pointer hover:text-secondary transition-colors">Semantics</span>
+<span class="text-on-surface-variant/40 select-none">•</span>
+<span class="text-on-surface font-body-md-mobile text-[15px] cursor-pointer hover:text-secondary transition-colors">Syntax</span>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="bg-background/90 backdrop-blur-md fixed bottom-0 left-0 right-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe border-t border-surface-variant/20">
+<div class="flex flex-col items-center justify-center text-secondary font-medium px-4 py-1 transition-all duration-200 cursor-pointer active:scale-[0.98]">
+<span class="material-symbols-outlined mb-1 text-[22px]">translate</span>
+<span class="font-label-sm-mobile text-[10px] tracking-wide">Translate</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant opacity-70 hover:opacity-100 transition-all duration-200 cursor-pointer active:scale-[0.98]">
+<span class="material-symbols-outlined mb-1 text-[22px]">history</span>
+<span class="font-label-sm-mobile text-[10px] tracking-wide">History</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant opacity-70 hover:opacity-100 transition-all duration-200 cursor-pointer active:scale-[0.98]">
+<span class="material-symbols-outlined mb-1 text-[22px]">settings</span>
+<span class="font-label-sm-mobile text-[10px] tracking-wide">Settings</span>
+</div>
+</nav>
+<script>
+    // Simplified interaction effect for minimalist design
+    document.querySelectorAll('.active-scale').forEach(el => {
+        el.addEventListener('mousedown', () => {
+            el.style.transform = 'scale(0.96)';
+        });
+        el.addEventListener('mouseup', () => {
+            el.style.transform = 'scale(1)';
+        });
+        el.addEventListener('mouseleave', () => {
+            el.style.transform = 'scale(1)';
+        });
+    });
+</script>
+</body></html>
