@@ -287,17 +287,15 @@ fun MainScreen(
                     tonalElevation = 0.dp,
                     shadowElevation = 0.dp
                 ) {
-                    val isWallpaperVisible = currentTab == AppTab.TRANSLATE && !isLookupExecuted && bingWallpaperUrl != null
-                    
                     NavigationBar(
-                        containerColor = if (isWallpaperVisible) MaterialTheme.colorScheme.surface.copy(alpha = 0.8f) else MaterialTheme.colorScheme.surface,
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
                         tonalElevation = 0.dp,
                         modifier = Modifier
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                             .clip(RoundedCornerShape(18.dp))
                             .border(
                                 1.dp,
-                                if (isWallpaperVisible) Color.White.copy(alpha = 0.1f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+                                Color.White.copy(alpha = 0.1f),
                                 RoundedCornerShape(18.dp)
                             )
                     ) {
@@ -339,7 +337,7 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = if (targetStateString != "stats" && targetStateString != "settings" && !isWallpaperVisible) innerPadding.calculateBottomPadding() else 0.dp)
+                    .padding(bottom = innerPadding.calculateBottomPadding())
             ) {
                 when (targetStateString) {
                     "stats" -> StatsDashboard(dbHelper = dbHelper, onBack = { showStats = false })
