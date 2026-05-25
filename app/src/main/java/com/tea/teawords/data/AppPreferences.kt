@@ -20,7 +20,8 @@ enum class LearningWordbook(
     CET4("cet4", "大学英语四级", "CET-4"),
     CET6("cet6", "大学英语六级", "CET-6"),
     TEM4("tem4", "英语专业四级", "TEM-4"),
-    TEM8("tem8", "英语专业八级", "TEM-8");
+    TEM8("tem8", "英语专业八级", "TEM-8"),
+    KY("ky", "考研英语", "Postgraduate");
 
     companion object {
         fun fromId(id: String): LearningWordbook? = values().firstOrNull { it.id == id }
@@ -89,6 +90,12 @@ class AppPreferences(context: Context) {
             prefs.edit().putBoolean(KEY_BING_WALLPAPER_ENABLED, value).apply()
         }
 
+    var predictiveBackEnabled: Boolean
+        get() = prefs.getBoolean(KEY_PREDICTIVE_BACK_ENABLED, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_PREDICTIVE_BACK_ENABLED, value).apply()
+        }
+
     companion object {
         private const val KEY_PRONUNCIATION_DIALECT = "pronunciation_dialect"
         private const val KEY_SELECTED_WORDBOOK_IDS = "selected_wordbook_ids"
@@ -98,5 +105,6 @@ class AppPreferences(context: Context) {
         private const val KEY_HOME_LAST_CLEARED = "home_last_cleared"
         private const val KEY_HITOKOTO_REFRESH_INTERVAL = "hitokoto_refresh_interval"
         private const val KEY_BING_WALLPAPER_ENABLED = "bing_wallpaper_enabled"
+        private const val KEY_PREDICTIVE_BACK_ENABLED = "predictive_back_enabled"
     }
 }

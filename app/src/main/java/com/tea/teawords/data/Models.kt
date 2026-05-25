@@ -85,7 +85,7 @@ data class ReviewSession(
     val sessionId: String = UUID.randomUUID().toString(),
     val vocabItems: List<VocabularyItem>,   // 本次复习的单词
     val problems: List<ClozeProblem>,       // 生成的题目
-    val answers: MutableList<ReviewAnswer> = mutableListOf(),
+    val answers: List<ReviewAnswer> = emptyList(),
     val currentProblemIndex: Int = 0,
     val difficulty: Int = 2,               // 难度
     val startTime: Long = System.currentTimeMillis()

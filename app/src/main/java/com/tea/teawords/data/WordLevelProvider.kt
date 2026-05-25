@@ -11,6 +11,7 @@ class WordLevelProvider(private val context: Context) {
     private val cet6Set = HashSet<String>()
     private val tem4Set = HashSet<String>()
     private val tem8Set = HashSet<String>()
+    private val kySet = HashSet<String>()
     private var isLoaded = false
 
     fun loadIfNeeded() {
@@ -22,8 +23,10 @@ class WordLevelProvider(private val context: Context) {
                 loadList("cet6.txt", cet6Set)
                 loadOptionalList("tem4.txt", tem4Set)
                 loadOptionalList("tem8.txt", tem8Set)
+                loadOptionalList("ky.txt", kySet)
                 if (tem4Set.isEmpty()) tem4Set.addAll(defaultTem4Words)
                 if (tem8Set.isEmpty()) tem8Set.addAll(defaultTem8Words)
+                if (kySet.isEmpty()) kySet.addAll(defaultKyWords)
                 isLoaded = true
             } catch (e: Exception) {
                 Log.e("WordLevelProvider", "Error loading word lists: ${e.message}", e)
@@ -80,6 +83,9 @@ class WordLevelProvider(private val context: Context) {
         if (tem8Set.contains(cleanedWord)) {
             levels.add("专八 TEM-8")
         }
+        if (kySet.contains(cleanedWord)) {
+            levels.add("考研英语")
+        }
         return levels
     }
 
@@ -88,7 +94,7 @@ class WordLevelProvider(private val context: Context) {
         val cleanedPrefix = prefix.trim().lowercase()
         if (cleanedPrefix.isEmpty()) return emptyList()
 
-        return sequenceOf(cet4Set, cet6Set, tem4Set, tem8Set)
+        return sequenceOf(cet4Set, cet6Set, tem4Set, tem8Set, kySet)
             .flatMap { it.asSequence() }
             .filter { it.startsWith(cleanedPrefix) }
             .distinct()
@@ -106,6 +112,7 @@ class WordLevelProvider(private val context: Context) {
                 LearningWordbook.CET6.id -> items.addAll(loadVocabularyItems("cet6.txt", limitPerBook))
                 LearningWordbook.TEM4.id -> items.addAll(defaultTem4Definitions.toVocabularyItems())
                 LearningWordbook.TEM8.id -> items.addAll(defaultTem8Definitions.toVocabularyItems())
+                LearningWordbook.KY.id -> items.addAll(loadVocabularyItems("ky.txt", limitPerBook))
             }
         }
 
@@ -162,6 +169,18 @@ class WordLevelProvider(private val context: Context) {
                 definition = definition,
                 timestamp = System.currentTimeMillis()
             )
+        }
+    }
+
+    fun getWordbookCount(id: String): Int {
+        loadIfNeeded()
+        return when (id) {
+            LearningWordbook.CET4.id -> cet4Set.size
+            LearningWordbook.CET6.id -> cet6Set.size
+            LearningWordbook.TEM4.id -> tem4Set.size
+            LearningWordbook.TEM8.id -> tem8Set.size
+            LearningWordbook.KY.id -> kySet.size
+            else -> 0
         }
     }
 
@@ -222,6 +241,131 @@ class WordLevelProvider(private val context: Context) {
             "terminate" to "v. 终止，结束",
             "unanimous" to "a. 一致同意的"
         )
+
+        private val defaultKyWords = setOf(
+            "abandon", "absorb", "abstract", "abundant", "accelerate", "access", "accompany",
+            "accomplish", "account", "accumulate", "accurate", "accuse", "achieve", "acknowledge",
+            "acquire", "adapt", "adequate", "adjust", "administration", "adopt", "advance",
+            "advantage", "advertise", "affair", "affect", "afford", "aggressive", "agriculture",
+            "allocate", "alternative", "amaze", "ambition", "analyze", "announce", "annual",
+            "anxiety", "apparent", "appeal", "appetite", "appliance", "application", "appoint",
+            "appreciate", "approach", "appropriate", "approve", "arise", "arrange", "artificial",
+            "aspect", "assemble", "assess", "assign", "assist", "associate", "assume", "assure",
+            "atmosphere", "attach", "attempt", "attend", "attitude", "attract", "attribute",
+            "authority", "automatic", "available", "aware", "balance", "barrier", "behalf",
+            "behave", "benefit", "betray", "bewilder", "boost", "boundary", "brand", "breed",
+            "budget", "burden", "calculate", "campaign", "capable", "capacity", "capture",
+            "career", "category", "celebrate", "challenge", "character", "characteristic",
+            "circumstance", "cite", "civilization", "claim", "clarify", "classic", "climate",
+            "collapse", "combine", "command", "comment", "commerce", "commit", "communicate",
+            "community", "companion", "compare", "compel", "compensate", "compete", "complain",
+            "complex", "complicate", "component", "compose", "comprehend", "comprehensive",
+            "concentrate", "concept", "concern", "conclude", "concrete", "condition", "conduct",
+            "conference", "confident", "confine", "confirm", "conflict", "confront", "congress",
+            "conscience", "conscious", "consequence", "consequently", "conservation", "conservative",
+            "considerable", "consistent", "constant", "constitute", "construct", "consult",
+            "consume", "contact", "contain", "contemporary", "content", "contest", "context",
+            "contract", "contrary", "contribute", "controversy", "convenient", "convention",
+            "convince", "cooperate", "coordinate", "cope", "correspond", "council", "counsel",
+            "create", "creature", "crisis", "criteria", "critical", "cultivate", "culture",
+            "curiosity", "current", "database", "debate", "debt", "decade", "deceive", "decent",
+            "declare", "decline", "decorate", "decrease", "defeat", "defend", "define",
+            "definitely", "definition", "deliver", "demand", "demonstrate", "deny", "depart",
+            "depend", "depict", "deposit", "depress", "derive", "deserve", "design", "desire",
+            "desperate", "despite", "destination", "destroy", "detect", "determine", "develop",
+            "device", "devote", "differ", "digital", "dignity", "dilemma", "dimension",
+            "diminish", "discipline", "disclose", "discount", "discourage", "display", "dispose",
+            "distinct", "distinguish", "distribute", "disturb", "diverse", "document", "domestic",
+            "dominate", "dramatic", "duration", "dynamic", "economical", "edition", "efficient",
+            "elaborate", "eliminate", "embrace", "emerge", "emission", "emotion", "emphasis",
+            "employ", "enable", "encounter", "encourage", "enormous", "ensure", "enterprise",
+            "entertainment", "enthusiasm", "entire", "entitle", "environment", "episode",
+            "equation", "equipment", "equivalent", "establish", "estate", "estimate", "evaluate",
+            "evident", "evolution", "exceed", "excellent", "exception", "excess", "exchange",
+            "exclude", "execute", "exercise", "exhaust", "exhibit", "expand", "expense",
+            "experiment", "expert", "exploit", "explore", "export", "expose", "extend",
+            "extensive", "extent", "external", "extraordinary", "extreme", "facility", "factor",
+            "faculty", "failure", "fashion", "feasible", "feature", "federal", "feedback",
+            "fiction", "finance", "flexible", "forecast", "formula", "fortune", "foundation",
+            "fragment", "framework", "frequency", "fulfill", "function", "fundamental", "furthermore",
+            "generate", "generous", "genius", "genuine", "gesture", "global", "glory", "govern",
+            "grace", "gradual", "grant", "guarantee", "guidance", "harmony", "hesitate", "highlight",
+            "horizon", "hostile", "household", "identify", "ignorance", "illustrate", "imaginary",
+            "immediate", "immense", "immigrant", "impact", "implement", "imply", "impose",
+            "impress", "impulse", "incident", "incline", "incredible", "independent", "indicate",
+            "individual", "inevitable", "infant", "influence", "inform", "ingredient", "inhabit",
+            "inherit", "initial", "initiative", "inner", "innovation", "inspect", "inspire",
+            "install", "instance", "institute", "instrument", "insult", "insurance", "intellectual",
+            "intelligence", "intense", "intention", "interact", "interfere", "interior",
+            "internal", "interpret", "interrupt", "interval", "interview", "intimate", "invade",
+            "invent", "invest", "investigate", "involve", "isolate", "issue", "joint", "journal",
+            "judgment", "justify", "laboratory", "launch", "layer", "layout", "league", "legal",
+            "legend", "legislation", "liberal", "liberty", "likewise", "limit", "literacy",
+            "literary", "literature", "living", "location", "logic", "longitude", "maintain",
+            "majority", "management", "manufacture", "margin", "massive", "mature", "maximum",
+            "mechanism", "medium", "mental", "mention", "merchant", "mercy", "mild", "military",
+            "minimum", "ministry", "minority", "miracle", "miserable", "mission", "moderate",
+            "modest", "modify", "monitor", "mood", "moral", "moreover", "motivate", "multiple",
+            "mutual", "mysterious", "narrow", "nationality", "negative", "neglect", "negotiate",
+            "neighbor", "neutral", "nevertheless", "normal", "notion", "nuclear", "numerous",
+            "objection", "objective", "obligation", "observe", "obstacle", "obtain", "obvious",
+            "occasion", "occupy", "offense", "official", "operate", "opinion", "opponent",
+            "opportunity", "oppose", "optimistic", "option", "orbit", "organize", "origin",
+            "original", "outcome", "outline", "output", "overcome", "overlook", "overseas",
+            "panel", "paradise", "paragraph", "parallel", "participate", "particular", "partner",
+            "passion", "passive", "patience", "payment", "penalty", "perceive", "percent",
+            "perfect", "perform", "period", "permanent", "permit", "persist", "personality",
+            "perspective", "persuade", "phenomenon", "philosophy", "phrase", "physical", "pilot",
+            "planet", "platform", "pleasure", "pledge", "plot", "policy", "pollution", "populate",
+            "portion", "portrait", "position", "positive", "possess", "potential", "poverty",
+            "practical", "pray", "precious", "precise", "predict", "prefer", "prejudice",
+            "preparation", "prescribe", "presence", "preserve", "pressure", "presumably",
+            "previous", "pride", "primary", "principle", "priority", "private", "privilege",
+            "probable", "procedure", "proceed", "process", "professional", "profit", "progress",
+            "prohibit", "project", "prominent", "promote", "prompt", "proof", "property",
+            "proportion", "proposal", "propose", "prospect", "prosperity", "protect", "protest",
+            "prove", "provide", "provoke", "psychology", "publication", "publish", "purchase",
+            "pursue", "qualify", "quantity", "quarter", "radical", "raise", "random", "range",
+            "rapid", "rare", "rate", "rational", "react", "readily", "realistic", "reasonable",
+            "recall", "receive", "recent", "recognition", "recommend", "recover", "recreation",
+            "reduce", "refer", "reference", "reflect", "reform", "refuge", "refuse", "regard",
+            "region", "register", "regulate", "reinforce", "reject", "relate", "relative",
+            "release", "relevant", "relief", "rely", "remain", "remark", "remedy", "remote",
+            "remove", "render", "replace", "represent", "republic", "reputation", "request",
+            "require", "research", "resemble", "reserve", "residence", "resign", "resist",
+            "resolution", "resolve", "resource", "respond", "responsibility", "restore",
+            "restrict", "result", "retain", "retire", "retreat", "reveal", "revenue", "reverse",
+            "revise", "revolution", "reward", "rhythm", "ridiculous", "rigid", "rival",
+            "romantic", "routine", "sacrifice", "safety", "salary", "sample", "satellite",
+            "satisfaction", "scale", "scatter", "schedule", "scheme", "scholar", "scratch",
+            "screen", "seal", "section", "secure", "seek", "select", "senior", "sense",
+            "sensitive", "separate", "sequence", "series", "session", "settle", "severe",
+            "shadow", "shrink", "significance", "significant", "similar", "simulate", "sincere",
+            "single", "sketch", "slave", "smooth", "social", "software", "solar", "sole",
+            "solid", "solution", "somehow", "sophisticated", "source", "span", "spare",
+            "specialist", "species", "specific", "specify", "spectacular", "sphere", "spirit",
+            "sponsor", "spot", "spread", "squeeze", "stable", "standard", "startle", "statistics",
+            "status", "steady", "stimulate", "strategic", "strategy", "strength", "stress",
+            "structure", "struggle", "studio", "substance", "substitute", "subtract", "succession",
+            "sufficient", "suggestion", "summit", "superior", "supplement", "supply", "support",
+            "suppose", "supreme", "surface", "surgery", "surplus", "surrender", "surround",
+            "survey", "survive", "suspect", "suspend", "sustain", "symbol", "sympathy",
+            "symptom", "system", "tackle", "technique", "technology", "temporary", "tendency",
+            "tender", "terminal", "territory", "terror", "theory", "therapy", "thereby",
+            "thorough", "threat", "thrill", "thrive", "thumb", "tolerance", "topic", "torture",
+            "tough", "track", "tradition", "trait", "transfer", "transform", "transit",
+            "transmit", "transparent", "transport", "trap", "treaty", "tremble", "tremendous",
+            "trend", "trial", "tribe", "trigger", "triumph", "tropical", "troublesome", "truly",
+            "trust", "truth", "tutor", "typical", "ultimate", "uncover", "undergo", "undergraduate",
+            "undertake", "unique", "universal", "urban", "urge", "urgent", "utility", "utilize",
+            "utmost", "utter", "vacant", "vague", "valid", "vanish", "variable", "vast",
+            "vehicle", "venture", "verbal", "verify", "version", "vertical", "veteran",
+            "victim", "vigorous", "violate", "virtual", "virtue", "visible", "vision",
+            "vital", "vivid", "volume", "voluntary", "voyage", "wander", "wealth", "weapon",
+            "welfare", "widespread", "witness", "workforce", "worship", "worthwhile", "yield",
+            "zone"
+        )
+
 
         private val defaultTem8Definitions = mapOf(
             "aberration" to "n. 偏差，异常",

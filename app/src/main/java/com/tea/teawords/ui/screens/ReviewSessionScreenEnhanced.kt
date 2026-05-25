@@ -1,7 +1,8 @@
 package com.tea.teawords.ui.screens
 
 import android.util.Log
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +69,6 @@ fun ReviewSessionScreenEnhanced(
         modifier = modifier
             .fillMaxSize()
             .background(Color.White)
-            .verticalScroll(rememberScrollState())
     ) {
         // 顶部进度条和计时器
         Box(
@@ -113,37 +114,53 @@ fun ReviewSessionScreenEnhanced(
         Divider()
 
         // 题目内容
-        if (session.currentProblemIndex < session.problems.size) {
-            val problem = session.problems[session.currentProblemIndex]
-            
-            ProblemDisplay(
-                problem = problem,
-                onOptionSelected = { selectedOption ->
-                    val answer = ReviewAnswer(
-                        problemId = problem.id,
-                        userAnswer = selectedOption,
-                        isCorrect = selectedOption.equals(problem.clozeWord, ignoreCase = true),
-                        userDefinition = null,
-                        timestamp = System.currentTimeMillis()
-                    )
-                    
-                    onAnswerSubmit(answer)
+        Box(modifier = Modifier.weight(1f)) {
+            AnimatedContent(
+                targetState = session.currentProblemIndex,
+                transitionSpec = {
+                    if (targetState < session.problems.size && initialState < session.problems.size) {
+                        fadeIn(animationSpec = tween(250, easing = FastOutSlowInEasing)) togetherWith
+                            fadeOut(animationSpec = tween(200))
+                    } else {
+                        fadeIn(animationSpec = tween(350)) togetherWith fadeOut(animationSpec = tween(200))
+                    }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            )
-        } else {
-            // 全部完成
-            CompletionScreen(
-                correctCount = session.correctCount,
-                totalCount = session.problems.size,
-                timeSpent = timerManager.calculateRecommendedTime(session.problems.size, session.difficulty) - timeRemaining,
-                onComplete = onReviewComplete,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            )
+                label = "ProblemTransition"
+            ) { index ->
+                if (index < session.problems.size) {
+                    val problem = session.problems[index]
+
+                    ProblemDisplay(
+                        problem = problem,
+                        onOptionSelected = { selectedOption ->
+                            val answer = ReviewAnswer(
+                                problemId = problem.id,
+                                userAnswer = selectedOption,
+                                isCorrect = selectedOption.equals(problem.clozeWord, ignoreCase = true),
+                                userDefinition = null,
+                                timestamp = System.currentTimeMillis()
+                            )
+
+                            onAnswerSubmit(answer)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight()
+                            .padding(16.dp)
+                    )
+                } else {
+                    // 全部完成
+                    CompletionScreen(
+                        correctCount = session.correctCount,
+                        totalCount = session.problems.size,
+                        timeSpent = timerManager.calculateRecommendedTime(session.problems.size, session.difficulty) - timeRemaining,
+                        onComplete = onReviewComplete,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -305,6 +322,12 @@ private fun CompletionScreen(
     onComplete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val completionScale by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+        label = "completionScale"
+    )
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -313,7 +336,7 @@ private fun CompletionScreen(
         Icon(
             Icons.Default.CheckCircle,
             contentDescription = null,
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(64.dp).scale(completionScale),
             tint = Color.Green
         )
 

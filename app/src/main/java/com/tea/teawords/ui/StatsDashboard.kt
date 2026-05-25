@@ -1,6 +1,11 @@
 package com.tea.teawords.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -112,10 +117,18 @@ fun StatsDashboard(
 
                 // Content
                 Box(modifier = Modifier.padding(bottom = 20.dp)) {
-                    when (selectedTab) {
-                        0 -> OverviewTab(analytics)
-                        1 -> VocabularyTab(analytics, dbHelper)
-                        2 -> ErrorTab(analytics)
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing)) togetherWith fadeOut(animationSpec = tween(200))
+                        },
+                        label = "StatsTabTransition"
+                    ) { tab ->
+                        when (tab) {
+                            0 -> OverviewTab(analytics)
+                            1 -> VocabularyTab(analytics, dbHelper)
+                            2 -> ErrorTab(analytics)
+                        }
                     }
                 }
             } else {
