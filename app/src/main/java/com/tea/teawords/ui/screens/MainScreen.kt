@@ -5,6 +5,7 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -33,6 +34,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -70,6 +72,28 @@ enum class SettingsPage {
 }
 
 data class BingWallpaper(val url: String)
+
+@Composable
+private fun RowScope.TeaNavItem(
+    currentTab: AppTab,
+    tab: AppTab,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    NavigationBarItem(
+        selected = currentTab == tab,
+        onClick = onClick,
+        icon = { Icon(icon, contentDescription = tab.title) },
+        label = { Text(tab.title, style = MaterialTheme.typography.labelSmall, maxLines = 1) },
+        colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = MaterialTheme.colorScheme.secondary,
+            selectedTextColor = MaterialTheme.colorScheme.secondary,
+            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f),
+            unselectedIconColor = MaterialTheme.colorScheme.outline,
+            unselectedTextColor = MaterialTheme.colorScheme.outline
+        )
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -254,8 +278,7 @@ fun MainScreen(
 
     val focusManager = LocalFocusManager.current
 
-    // Handle system back button with logic priority
-    BackHandler(enabled = showStats || showSettings || reviewSession != null || isLookupExecuted || currentTab != AppTab.TRANSLATE || isInputFocused) {
+    val handleBackAction = {
         when {
             showStats -> showStats = false
             showSettings -> showSettings = false
@@ -275,71 +298,256 @@ fun MainScreen(
         }
     }
 
+    var backProgress by remember { mutableFloatStateOf(0f) }
+    var isBackInProgress by remember { mutableStateOf(false) }
+
+    val backHandlerEnabled = showStats || showSettings || reviewSession != null || isLookupExecuted || currentTab != AppTab.TRANSLATE || isInputFocused
+
+    if (predictiveBackEnabled) {
+        PredictiveBackHandler(enabled = backHandlerEnabled) { progress ->
+            try {
+                isBackInProgress = true
+                progress.collect { event ->
+                    backProgress = event.progress
+                }
+                handleBackAction()
+            } catch (e: Exception) {
+                // Handle cancellation
+            } finally {
+                isBackInProgress = false
+                backProgress = 0f
+            }
+        }
+    } else {
+        BackHandler(enabled = backHandlerEnabled) {
+            handleBackAction()
+        }
+    }
+
     Scaffold(
-        bottomBar = {
-            AnimatedVisibility(
-                visible = !showStats && !showSettings,
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut()
+        containerColor = MaterialTheme.colorScheme.background
+    ) { _ ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Base Layer: Tabs Content
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        if (isBackInProgress && predictiveBackEnabled && (showStats || showSettings)) {
+                            val scale = 0.95f + (backProgress * 0.05f)
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = 0.5f + (backProgress * 0.5f)
+                        }
+                    }
             ) {
-                Surface(
-                    color = Color.Transparent,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp
-                ) {
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                        tonalElevation = 0.dp,
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .border(
-                                1.dp,
-                                Color.White.copy(alpha = 0.1f),
-                                RoundedCornerShape(18.dp)
+                AnimatedContent(
+                    targetState = currentTab.name,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(220, delayMillis = 90)) +
+                                scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 90)))
+                            .togetherWith(fadeOut(animationSpec = tween(90)))
+                    },
+                    label = "TabContentTransition"
+                ) { targetTabName ->
+                    when (targetTabName) {
+                        AppTab.TRANSLATE.name -> {
+                            AnimatedContent(
+                                targetState = isLookupExecuted,
+                                transitionSpec = {
+                                    if (targetState) {
+                                        (slideInHorizontally(initialOffsetX = { it }) + fadeIn())
+                                            .togetherWith(slideOutHorizontally(targetOffsetX = { -it / 3 }) + fadeOut())
+                                    } else {
+                                        (slideInHorizontally(initialOffsetX = { -it / 3 }) + fadeIn())
+                                            .togetherWith(slideOutHorizontally(targetOffsetX = { it }) + fadeOut())
+                                    }
+                                },
+                                label = "TranslateSearchTransition"
+                            ) { lookupExecuted ->
+                                if (!lookupExecuted) {
+                                    HomeView(
+                                        searchQuery = searchQuery,
+                                        onQueryChange = { searchQuery = it },
+                                        onSearch = { triggerSearch(searchQuery, true) },
+                                        suggestions = suggestions,
+                                        isInputFocused = isInputFocused,
+                                        onFocusChange = { isInputFocused = it },
+                                        historyList = historyList.filter { it.timestamp > homeLastClearedTimestamp }.take(5),
+                                        homeTitle = homeTitle,
+                                        homeSubtitle = homeSubtitle,
+                                        onHistoryClick = { word ->
+                                            returnTabAfterResult = AppTab.TRANSLATE
+                                            searchQuery = word
+                                            triggerSearch(word, false)
+                                        },
+                                        onClearHistory = {
+                                            val now = System.currentTimeMillis()
+                                            homeLastClearedTimestamp = now
+                                            preferences.homeLastClearedTimestamp = now
+                                        },
+                                        onMenuClick = { showSettings = true },
+                                        onPersonClick = { showStats = true },
+                                        wallpaperUrl = bingWallpaperUrl
+                                    )
+                                } else {
+                                    ResultView(
+                                        query = searchQuery,
+                                        isSearching = isSearching,
+                                        result = searchResult,
+                                        translation = translatedText,
+                                        levels = wordLevels,
+                                        pronunciationDialect = pronunciationDialect,
+                                        isStarred = isStarred,
+                                        onStarToggle = {
+                                            if (isStarred) {
+                                                dbHelper.removeVocabulary(searchQuery)
+                                                isStarred = false
+                                            } else {
+                                                val defSnippet = searchResult?.meanings?.firstOrNull()?.definitions?.firstOrNull()?.definition
+                                                    ?: translatedText ?: ""
+                                                val phonetic = searchResult?.phonetic ?: ""
+                                                dbHelper.addVocabulary(searchQuery, phonetic, defSnippet)
+                                                isStarred = true
+                                            }
+                                        },
+                                        onBack = {
+                                            isLookupExecuted = false
+                                            searchQuery = ""
+                                            searchResult = null
+                                            translatedText = null
+                                            currentTab = returnTabAfterResult
+                                            returnTabAfterResult = AppTab.TRANSLATE
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        AppTab.HISTORY.name -> {
+                            RecordsView(
+                                historyList = historyList,
+                                vocabularyList = vocabularyList,
+                                onItemClick = { word ->
+                                    returnTabAfterResult = AppTab.HISTORY
+                                    currentTab = AppTab.TRANSLATE
+                                    searchQuery = word
+                                    triggerSearch(word, false)
+                                },
+                                onClearHistory = {
+                                    dbHelper.clearHistory()
+                                    historyList = emptyList()
+                                },
+                                onDeleteHistory = { word ->
+                                    dbHelper.deleteHistoryItem(word)
+                                    historyList = dbHelper.getHistory()
+                                },
+                                onDeleteVocab = { word ->
+                                    dbHelper.removeVocabulary(word)
+                                    vocabularyList = dbHelper.getVocabulary()
+                                }
                             )
-                    ) {
-                        TeaNavItem(currentTab, AppTab.TRANSLATE, Icons.Default.Search) { 
-                            currentTab = AppTab.TRANSLATE 
-                            showStats = false
-                            showSettings = false
                         }
-                        TeaNavItem(currentTab, AppTab.HISTORY, Icons.Default.History) {
-                            currentTab = AppTab.HISTORY 
-                            showStats = false
-                            showSettings = false
-                        }
-                        TeaNavItem(currentTab, AppTab.REVIEW, Icons.Default.AutoStories) { 
-                            currentTab = AppTab.REVIEW 
-                            showStats = false
-                            showSettings = false
+                        AppTab.REVIEW.name -> {
+                            ReviewView(
+                                historyList = historyList,
+                                selectedWordbookIds = selectedWordbookIds,
+                                levelProvider = levelProvider,
+                                reviewSession = reviewSession,
+                                clozeGenerator = clozeGenerator,
+                                dbHelper = dbHelper,
+                                onStartReview = { problems ->
+                                    reviewSession = ReviewSession(
+                                        vocabItems = problems.map { problem ->
+                                            VocabularyItem(
+                                                word = problem.originalWord,
+                                                phonetic = null,
+                                                definition = problem.sentence,
+                                                timestamp = System.currentTimeMillis()
+                                            )
+                                        },
+                                        problems = problems,
+                                        difficulty = if (problems.isEmpty()) {
+                                            2
+                                        } else {
+                                            problems.map { it.difficulty }.average().toInt().coerceIn(1, 5)
+                                        }
+                                    )
+                                },
+                                onCancelReview = { reviewSession = null },
+                                onAnswerSubmit = { answer ->
+                                    reviewSession?.let { session ->
+                                        // Update database stats
+                                        val word = session.currentProblem?.originalWord ?: ""
+                                        if (word.isNotEmpty()) {
+                                            dbHelper.updateVocabStats(word, answer.isCorrect)
+                                            if (!answer.isCorrect) {
+                                                dbHelper.recordError(ErrorRecord(
+                                                    problemId = answer.problemId,
+                                                    word = word,
+                                                    userAnswer = answer.userAnswer,
+                                                    correctAnswer = session.currentProblem?.clozeWord ?: "",
+                                                    lastAttemptTime = System.currentTimeMillis()
+                                                ))
+                                            }
+                                        }
+
+                                        reviewSession = session.copy(
+                                            answers = session.answers + answer,
+                                            currentProblemIndex = session.currentProblemIndex + 1
+                                        )
+                                    }
+                                },
+                                onReviewComplete = {
+                                    reviewSession?.let { session ->
+                                        val timeSpent = (System.currentTimeMillis() - session.startTime) / 1000
+                                        val accuracy = if (session.problems.isNotEmpty())
+                                            (session.correctCount.toFloat() / session.problems.size) * 100 else 0f
+
+                                        dbHelper.recordReviewSession(ReviewSessionRecord(
+                                            sessionId = session.sessionId,
+                                            totalProblems = session.problems.size,
+                                            correctCount = session.correctCount,
+                                            accuracy = accuracy,
+                                            timeSpentSeconds = timeSpent,
+                                            averageTimePerProblem = if (session.problems.isNotEmpty()) timeSpent.toFloat() / session.problems.size else 0f,
+                                            difficulty = session.difficulty
+                                        ))
+                                    }
+                                    reviewSession = null
+                                }
+                            )
                         }
                     }
                 }
             }
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
-        // Main Content
-        AnimatedContent(
-            targetState = if (showStats) "stats" else if (showSettings) "settings" else currentTab.name,
-            transitionSpec = {
-                if (targetState == "stats" || targetState == "settings" || initialState == "stats" || initialState == "settings") {
-                    (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { it } + fadeOut())
-                } else {
-                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                }
-            },
-            label = "MainContentTransition"
-        ) { targetStateString ->
-            val isWallpaperVisible = targetStateString == AppTab.TRANSLATE.name && !isLookupExecuted && bingWallpaperUrl != null && bingWallpaperEnabled
-            
-            Box(
+
+            // Overlay Layer: Stats and Settings
+            AnimatedContent(
+                targetState = if (showStats) "stats" else if (showSettings) "settings" else "none",
+                transitionSpec = {
+                    if (targetState != "none") {
+                        (slideInHorizontally(initialOffsetX = { it }) + fadeIn(animationSpec = tween(300)))
+                            .togetherWith(slideOutHorizontally(targetOffsetX = { -it / 3 }) + fadeOut(animationSpec = tween(150)))
+                    } else {
+                        (fadeIn(animationSpec = tween(300, delayMillis = 100)))
+                            .togetherWith(slideOutHorizontally(targetOffsetX = { it }) + fadeOut(animationSpec = tween(150)))
+                    }
+                },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = innerPadding.calculateBottomPadding())
-            ) {
-                when (targetStateString) {
+                    .graphicsLayer {
+                        if (isBackInProgress && predictiveBackEnabled && (showStats || showSettings)) {
+                            val scale = 1f - (backProgress * 0.05f)
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = backProgress * 40.dp.toPx()
+                            clip = true
+                            shape = RoundedCornerShape(16.dp * backProgress)
+                        }
+                    },
+                label = "OverlayContentTransition"
+            ) { targetOverlay ->
+                when (targetOverlay) {
                     "stats" -> StatsDashboard(dbHelper = dbHelper, onBack = { showStats = false })
                     "settings" -> SettingsView(
                         pronunciationDialect = pronunciationDialect,
@@ -385,185 +593,46 @@ fun MainScreen(
                         },
                         onBack = { showSettings = false }
                     )
-                    AppTab.TRANSLATE.name -> {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            if (!isLookupExecuted) {
-                                HomeView(
-                                    searchQuery = searchQuery,
-                                    onQueryChange = { searchQuery = it },
-                                    onSearch = { triggerSearch(searchQuery, true) },
-                                    suggestions = suggestions,
-                                    isInputFocused = isInputFocused,
-                                    onFocusChange = { isInputFocused = it },
-                                    historyList = historyList.filter { it.timestamp > homeLastClearedTimestamp }.take(5),
-                                    homeTitle = homeTitle,
-                                    homeSubtitle = homeSubtitle,
-                                    onHistoryClick = { word ->
-                                        returnTabAfterResult = AppTab.TRANSLATE
-                                        searchQuery = word
-                                        triggerSearch(word, false)
-                                    },
-                                    onClearHistory = {
-                                        val now = System.currentTimeMillis()
-                                        homeLastClearedTimestamp = now
-                                        preferences.homeLastClearedTimestamp = now
-                                    },
-                                    onMenuClick = { showSettings = true },
-                                    onPersonClick = { showStats = true },
-                                    wallpaperUrl = bingWallpaperUrl
-                                )
-                            } else {
-                                ResultView(
-                                    query = searchQuery,
-                                    isSearching = isSearching,
-                                    result = searchResult,
-                                    translation = translatedText,
-                                    levels = wordLevels,
-                                    pronunciationDialect = pronunciationDialect,
-                                    isStarred = isStarred,
-                                    onStarToggle = {
-                                        if (isStarred) {
-                                            dbHelper.removeVocabulary(searchQuery)
-                                            isStarred = false
-                                        } else {
-                                            val defSnippet = searchResult?.meanings?.firstOrNull()?.definitions?.firstOrNull()?.definition 
-                                                ?: translatedText ?: ""
-                                            val phonetic = searchResult?.phonetic ?: ""
-                                            dbHelper.addVocabulary(searchQuery, phonetic, defSnippet)
-                                            isStarred = true
-                                        }
-                                    },
-                                    onBack = {
-                                        isLookupExecuted = false
-                                        searchQuery = ""
-                                        searchResult = null
-                                        translatedText = null
-                                        currentTab = returnTabAfterResult
-                                        returnTabAfterResult = AppTab.TRANSLATE
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    AppTab.HISTORY.name -> {
-                        RecordsView(
-                            historyList = historyList,
-                            vocabularyList = vocabularyList,
-                            onItemClick = { word ->
-                                returnTabAfterResult = AppTab.HISTORY
-                                currentTab = AppTab.TRANSLATE
-                                searchQuery = word
-                                triggerSearch(word, false)
-                            },
-                            onClearHistory = {
-                                dbHelper.clearHistory()
-                                historyList = emptyList()
-                            },
-                            onDeleteHistory = { word ->
-                                dbHelper.deleteHistoryItem(word)
-                                historyList = dbHelper.getHistory()
-                            },
-                            onDeleteVocab = { word ->
-                                dbHelper.removeVocabulary(word)
-                                vocabularyList = dbHelper.getVocabulary()
-                            }
-                        )
-                    }
-                    AppTab.REVIEW.name -> {
-                        ReviewView(
-                            historyList = historyList,
-                            selectedWordbookIds = selectedWordbookIds,
-                            levelProvider = levelProvider,
-                            reviewSession = reviewSession,
-                            clozeGenerator = clozeGenerator,
-                            dbHelper = dbHelper,
-                            onStartReview = { problems ->
-                                reviewSession = ReviewSession(
-                                    vocabItems = problems.map { problem ->
-                                        VocabularyItem(
-                                            word = problem.originalWord,
-                                            phonetic = null,
-                                            definition = problem.sentence,
-                                            timestamp = System.currentTimeMillis()
-                                        )
-                                    },
-                                    problems = problems,
-                                    difficulty = if (problems.isEmpty()) {
-                                        2
-                                    } else {
-                                        problems.map { it.difficulty }.average().toInt().coerceIn(1, 5)
-                                    }
-                                )
-                            },
-                            onCancelReview = { reviewSession = null },
-                            onAnswerSubmit = { answer ->
-                                reviewSession?.let { session ->
-                                    // Update database stats
-                                    val word = session.currentProblem?.originalWord ?: ""
-                                    if (word.isNotEmpty()) {
-                                        dbHelper.updateVocabStats(word, answer.isCorrect)
-                                        if (!answer.isCorrect) {
-                                            dbHelper.recordError(ErrorRecord(
-                                                problemId = answer.problemId,
-                                                word = word,
-                                                userAnswer = answer.userAnswer,
-                                                correctAnswer = session.currentProblem?.clozeWord ?: "",
-                                                lastAttemptTime = System.currentTimeMillis()
-                                            ))
-                                        }
-                                    }
+                }
+            }
 
-                                    reviewSession = session.copy(
-                                        answers = session.answers + answer,
-                                        currentProblemIndex = session.currentProblemIndex + 1
-                                    )
-                                }
-                            },
-                            onReviewComplete = {
-                                reviewSession?.let { session ->
-                                    val timeSpent = (System.currentTimeMillis() - session.startTime) / 1000
-                                    val accuracy = if (session.problems.isNotEmpty()) 
-                                        (session.correctCount.toFloat() / session.problems.size) * 100 else 0f
-                                    
-                                    dbHelper.recordReviewSession(ReviewSessionRecord(
-                                        sessionId = session.sessionId,
-                                        totalProblems = session.problems.size,
-                                        correctCount = session.correctCount,
-                                        accuracy = accuracy,
-                                        timeSpentSeconds = timeSpent,
-                                        averageTimePerProblem = if (session.problems.isNotEmpty()) timeSpent.toFloat() / session.problems.size else 0f,
-                                        difficulty = session.difficulty
-                                    ))
-                                }
-                                reviewSession = null
-                            }
+            // Floating dock overlay
+            AnimatedVisibility(
+                visible = !showStats && !showSettings && reviewSession == null,
+                enter = slideInVertically { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    tonalElevation = 0.dp,
+                    windowInsets = WindowInsets(0),
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                            RoundedCornerShape(28.dp)
                         )
+                ) {
+                    TeaNavItem(currentTab, AppTab.TRANSLATE, Icons.Default.Search) { 
+                        currentTab = AppTab.TRANSLATE 
+                        showStats = false
+                        showSettings = false
+                    }
+                    TeaNavItem(currentTab, AppTab.HISTORY, Icons.Default.History) {
+                        currentTab = AppTab.HISTORY 
+                        showStats = false
+                        showSettings = false
+                    }
+                    TeaNavItem(currentTab, AppTab.REVIEW, Icons.Default.AutoStories) { 
+                        currentTab = AppTab.REVIEW 
+                        showStats = false
+                        showSettings = false
                     }
                 }
             }
         }
     }
 }
-
-@Composable
-private fun RowScope.TeaNavItem(
-    currentTab: AppTab,
-    tab: AppTab,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
-) {
-    NavigationBarItem(
-        selected = currentTab == tab,
-        onClick = onClick,
-        icon = { Icon(icon, contentDescription = tab.title) },
-        label = { Text(tab.title, style = MaterialTheme.typography.labelSmall, maxLines = 1) },
-        colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = MaterialTheme.colorScheme.secondary,
-            selectedTextColor = MaterialTheme.colorScheme.secondary,
-            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f),
-            unselectedIconColor = MaterialTheme.colorScheme.outline,
-            unselectedTextColor = MaterialTheme.colorScheme.outline
-        )
-    )
-}
-

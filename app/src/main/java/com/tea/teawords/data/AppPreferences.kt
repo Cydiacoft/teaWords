@@ -91,7 +91,7 @@ class AppPreferences(context: Context) {
         }
 
     var predictiveBackEnabled: Boolean
-        get() = prefs.getBoolean(KEY_PREDICTIVE_BACK_ENABLED, true)
+        get() = prefs.getBoolean(KEY_PREDICTIVE_BACK_ENABLED, false)
         set(value) {
             prefs.edit().putBoolean(KEY_PREDICTIVE_BACK_ENABLED, value).apply()
         }

@@ -44,8 +44,6 @@ fun ResultView(
             .statusBarsPadding()
             .padding(horizontal = 24.dp)
     ) {
-        Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -83,6 +81,14 @@ fun ResultView(
                         )
                     }
                 }
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(onClick = onStarToggle) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = "Save word",
+                        tint = if (isStarred) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant
+                    )
+                }
             }
         }
 
@@ -97,87 +103,89 @@ fun ResultView(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 100.dp)
         ) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = query,
-                            style = MaterialTheme.typography.displayLarge.copy(fontSize = 32.sp),
-                            color = MaterialTheme.colorScheme.primary
+                val queryFontSize = when {
+                    query.length > 100 -> 16.sp
+                    query.length > 20 -> 20.sp
+                    else -> 32.sp
+                }
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                            MaterialTheme.shapes.large
                         )
-                        val matchedPhonetic = selectPhoneticByDialect(result?.phonetics, pronunciationDialect)
-                        val phoneticsText = matchedPhonetic?.text ?: result?.phonetic
-                        if (!phoneticsText.isNullOrEmpty()) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(top = 4.dp)
-                            ) {
-                                Text(
-                                    text = phoneticsText,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                                val audioUrl = matchedPhonetic?.audio?.takeIf { it.isNotBlank() }
-                                if (!audioUrl.isNullOrEmpty()) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    IconButton(
-                                        onClick = { playAudio(context, audioUrl) },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.PlayArrow,
-                                            contentDescription = pronunciationDialect.label,
-                                            tint = MaterialTheme.colorScheme.secondary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                ) {
+                    Column {
+                        // Original Content
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = query,
+                                fontSize = queryFontSize,
+                                lineHeight = queryFontSize * 1.4f,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            val matchedPhonetic = selectPhoneticByDialect(result?.phonetics, pronunciationDialect)
+                            val phoneticsText = matchedPhonetic?.text ?: result?.phonetic
+                            if (!phoneticsText.isNullOrEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = phoneticsText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                    val audioUrl = matchedPhonetic?.audio?.takeIf { it.isNotBlank() }
+                                    if (!audioUrl.isNullOrEmpty()) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        IconButton(
+                                            onClick = { playAudio(context, audioUrl) },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.PlayArrow,
+                                                contentDescription = pronunciationDialect.label,
+                                                tint = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    IconButton(onClick = onStarToggle) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = "Save word",
-                            tint = if (isStarred) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-            }
-
-            if (translation != null && translation.isNotEmpty()) {
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(
-                                1.dp,
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                                MaterialTheme.shapes.large
-                            )
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "中文释义",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = translation,
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                        // Translation Content (Integrated into the same Card)
+                        if (translation != null && translation.isNotEmpty()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFE3F2FD)) // Light blue tint background
+                                    .padding(16.dp)
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "中文翻译",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = Color(0xFF1976D2) // Darker blue for label
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = translation,
+                                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
                         }
                     }
                 }

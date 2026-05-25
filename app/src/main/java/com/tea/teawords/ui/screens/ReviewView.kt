@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -53,11 +54,6 @@ fun ReviewView(
 ) {
     var showStats by remember { mutableStateOf(false) }
     var showIPAChart by remember { mutableStateOf(false) }
-
-    BackHandler(enabled = showStats || showIPAChart) {
-        showStats = false
-        showIPAChart = false
-    }
 
     BackHandler(enabled = showStats || showIPAChart) {
         showStats = false
@@ -155,7 +151,8 @@ fun ReviewStartScreen(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 24.dp)
+            .padding(top = 16.dp, bottom = 100.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -435,33 +432,26 @@ fun ReviewSessionScreen(
                         ),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp)
-                    ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
                         Text(
                             text = problem.blankedSentence,
-                            modifier = Modifier
-                                .matchParentSize()
-                                .alpha(if (showAnswer) 0f else 1f),
+                            modifier = Modifier.alpha(if (showAnswer) 0f else 1f),
                             style = MaterialTheme.typography.headlineSmall.copy(
                                 fontSize = 22.sp,
                                 lineHeight = 32.sp
                             ),
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Text(
-                            text = problem.sentence,
-                            modifier = Modifier
-                                .matchParentSize()
-                                .alpha(if (showAnswer) 1f else 0f),
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontSize = 22.sp,
-                                lineHeight = 32.sp
-                            ),
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        if (showAnswer) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "完整句子：${problem.sentence}",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontStyle = FontStyle.Italic
+                                ),
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
             }
