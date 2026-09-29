@@ -5,21 +5,34 @@ plugins {
 }
 
 android {
-    namespace = "com.tea.teawords"
-    compileSdk = 35
+    namespace = "com.teameow.teawords"
+    compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.tea.teawords"
+        applicationId = "com.teameow.teawords"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // CI/local release builds supply signing secrets through the environment, never the repository.
+    val releaseKeyStore = providers.environmentVariable("TEAWORDS_KEYSTORE").orNull
+    if (releaseKeyStore != null) {
+        signingConfigs {
+            create("distribution") {
+                storeFile = file(releaseKeyStore)
+                storePassword = providers.environmentVariable("TEAWORDS_STORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("TEAWORDS_KEY_ALIAS").orElse("teawords").get()
+                keyPassword = providers.environmentVariable("TEAWORDS_KEY_PASSWORD").get()
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseKeyStore != null) signingConfig = signingConfigs.getByName("distribution")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -40,6 +53,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -51,6 +65,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.material)
+    implementation("com.google.mlkit:translate:17.0.3")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -9,3 +9,10 @@
 /captures
 .externalNativeBuild
 .cxx
+/.kotlin/
+/validation/
+/.idea/
+**/build/
+/tools/out/
+/tools/data/*.csv
+__pycache__/
