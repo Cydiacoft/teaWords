@@ -1,6 +1,5 @@
 package com.teameow.teawords.ui.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -31,6 +30,9 @@ import com.teameow.teawords.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -56,7 +58,12 @@ fun LearningScreen(
     val context = LocalContext.current
     val repo = remember(dbHelper) { LearningRepository(dbHelper) }
     val scope = rememberCoroutineScope()
+    val pocketRepo = remember(dbHelper) { PocketLearningRepository(dbHelper) }
+    var pocketRound by remember { mutableStateOf<PocketRound?>(null) }
     val prefs = remember { context.getSharedPreferences("learning", 0) }
+    var pocketWordLimit by rememberSaveable { mutableIntStateOf(
+        prefs.getInt("pocket_word_limit", PocketPlanner.DEFAULT_WORD_LIMIT).coerceIn(1, PocketPlanner.MAX_WORD_LIMIT)
+    ) }
 
     var books by remember { mutableStateOf(emptyList<com.teameow.teawords.data.search.WordSearchRepository.BookInfo>()) }
     var tags by remember { mutableStateOf(emptyMap<String, String>()) }
@@ -84,6 +91,7 @@ fun LearningScreen(
     var lastScreened by remember { mutableStateOf(emptyList<Knowledge>()) }
     var screeningTotal by remember { mutableIntStateOf(0) }
     var showImport by remember { mutableStateOf(false) }
+    var diagnosticBusy by remember { mutableStateOf(false) }
     var importText by rememberSaveable { mutableStateOf("") }
 
     suspend fun reload() {
@@ -93,6 +101,7 @@ fun LearningScreen(
             dictionary.books() to LearningCatalog(dbHelper, dictionary).load(selectedBookIds)
         }
         newStudiedToday = withContext(Dispatchers.IO) { repo.newWordsSince(dayStart) }
+        pocketRound = withContext(Dispatchers.IO) { pocketRepo.load() }
         books = result.first
         states = result.second.states
         words = result.second.words
@@ -141,29 +150,23 @@ fun LearningScreen(
         }
     }
 
-    BackHandler(mode != "home" && !busy) { mode = "home" }
-
     // The host keeps the floating dock visible on the learning pages; reporting the current mode
     // lets it withhold the dock only during a running round, where leaving would discard it.
     LaunchedEffect(mode) { onModeChange(mode) }
     DisposableEffect(Unit) { onDispose { onModeChange("home") } }
 
-    // The diagnostic is a full page of its own; it owns its navigation and result screen.
-    if (mode == "diagnose") {
-        DiagnosticScreen(
-            dbHelper = dbHelper,
-            learningWords = words.keys, wordTags = tags,
-            onBack = { mode = "home" },
-            onFinished = { mode = "home" }
-        )
-        return
+    var homeClock by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(mode, lifecycle) {
+        if (mode == "home") lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) { homeClock = System.currentTimeMillis(); delay(15_000) }
+        }
     }
-
-    val now = System.currentTimeMillis()
+    val now = homeClock
     // Recomputed whenever the knowledge states or the round size change; never cached against a
     // frozen clock, otherwise a freshly screened word would not enter today's plan.
     val sampleDay = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(now))
-    val scheduledPlan = remember(states, limit, newBudget, mode, sampleDay) {
+    val scheduledPlan = remember(states, limit, newBudget, mode, sampleDay, now) {
         LearningEngine.queue(states, now, limit, newBudget, prefs.getString("sample_day", null) != sampleDay)
     }
     val unseen = states.filter { it.report == SelfReport.UNSEEN && it.attempts == 0 }
@@ -287,28 +290,62 @@ fun LearningScreen(
         }
     }
 
+    val page: @Composable (String, () -> Unit) -> Unit = { pageMode, back ->
+    if (pageMode == "pocketSetup") {
+        PocketRoundSetupScreen(initialWordLimit = pocketWordLimit, busy = busy,
+            error = message, onBack = back, onStart = { count ->
+                val round = PocketPlanner.build(states, words, newBudget, System.currentTimeMillis(),
+                    screeningPlan.learnDirectly.map { it.first.word } + screeningQueue.map { it.word }, wordLimit = count)
+                if (round == null) message = if (states.isEmpty()) "先选择词书或添加词库，就能开始小练习"
+                    else "今天的新词额度已用完，暂时也没有到期的词，稍后再来吧"
+                else {
+                    busy = true
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { pocketRepo.start(round) }
+                            pocketWordLimit = count
+                            prefs.edit().putInt("pocket_word_limit", count).apply()
+                            pocketRound = round
+                            message = null
+                            mode = "pocket"
+                        } catch (e: Exception) { message = "开始失败：${e.message}" }
+                        finally { busy = false }
+                    }
+                }
+            })
+    } else if (pageMode == "pocket" && pocketRound != null) {
+        PocketLearningScreen(dbHelper, pocketRound!!, retention,
+            onRoundChange = { pocketRound = it }, onBack = back,
+            onBusyChange = { diagnosticBusy = it })
+    } else if (pageMode == "diagnose") {
+        DiagnosticScreen(
+            dbHelper = dbHelper, learningWords = words.keys, wordTags = tags,
+            onBack = back, onFinished = back, onBusyChange = { diagnosticBusy = it }
+        )
+    } else {
     TeaListPage(
-        floatingActionButton = if (mode == "home") {{
+        loading = busy && pageMode != "session",
+        floatingActionButton = if (pageMode == "home") {{
             FloatingActionButton(onClick = { showProfile = true }, containerColor = MaterialTheme.colorScheme.primaryContainer) {
                 Icon(AppSymbols.Person, "词汇知识画像")
             }
         }} else null,
-        title = when (mode) {
+        title = when (pageMode) {
             "screen" -> "快速排雷"
             "session" -> "学习与复习"
             "diagnose" -> "词汇能力诊断"
             else -> "学习"
         },
-        subtitle = when (mode) {
+        subtitle = when (pageMode) {
             "screen" -> "凭印象判断，自评不计作测试掌握"
             "session" -> "主动回忆，答对一次不代表掌握"
             "diagnose" -> "自适应选题，快速定位你的水平"
             else -> "把今天真正值得学的词集中在一处"
         },
-        onBack = if (mode != "home") ({ mode = "home" }) else null,
+        onBack = if (pageMode != "home") back else null,
         backEnabled = !busy,
         actions = {
-            if (mode == "home") {
+            if (pageMode == "home") {
                 IconButton(onClick = { mode = "diagnose" }, enabled = !busy) {
                     Icon(AppSymbols.Insights, "词汇能力诊断")
                 }
@@ -317,26 +354,40 @@ fun LearningScreen(
             IconButton(onClick = onShowStats, enabled = !busy) { Icon(AppSymbols.BarChart, "学习统计") }
         }
     ) {
-        if (busy && mode != "session") item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         message?.let { note -> item { TeaCaption(note) } }
+        if (pageMode == "home") item {
+            val paused = pocketRound?.takeUnless { it.complete }
+            TeaCard(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+                Text("随手练一小轮", style = MaterialTheme.typography.headlineMedium)
+                Text(paused?.let { "本轮 ${it.wordCount} 个词 · 随时暂停续接" } ?: "词数由你选择 · 随时暂停续接")
+                TeaCaption("听音、配对、词义、拼写和语境，换着方式练")
+                val scheduled = states.filter { it.attempts > 0 && it.due > now }
+                TeaCaption("已到期 $dueCount 个 · 已安排待复习 ${scheduled.size} 个")
+                scheduled.minOfOrNull { it.due }?.let { due ->
+                    TeaCaption("最近一次复习：${SimpleDateFormat("MM月dd日 HH:mm", Locale.CHINA).format(Date(due))}")
+                }
+                paused?.let { TeaCaption("上次完成 ${it.done.size} / ${it.tasks.size} 步，接着来就好") }
+                Button(enabled = !busy, modifier = Modifier.fillMaxWidth(), onClick = {
+                    if (paused != null) mode = "pocket"
+                    else { message = null; mode = "pocketSetup" }
+                }) { Text(if (paused != null) "继续小练习" else "开始小练习") }
+            }
+        }
 
         when {
-            mode == "screen" -> screeningMode(
+            pageMode == "screen" -> screeningMode(
                 current = screeningQueue.firstOrNull(),
                 upcoming = screeningQueue.take(10),
                 screened = (screeningTotal - screeningQueue.size).coerceAtLeast(0),
                 total = screeningTotal,
                 busy = busy,
                 lastScreened = lastScreened,
-                abilityNote = ScreeningPriority.describe(ability, screeningPlan),
-                skippedKnown = screeningPlan.skipAsKnown.size,
-                directLearn = screeningPlan.learnDirectly.size,
                 onRate = ::markScreened,
                 onUndo = ::undoLast,
-                onFinish = { mode = "home" }
+                onFinish = back
             )
 
-            mode == "session" -> sessionMode(
+            pageMode == "session" -> sessionMode(
                 queue = queue,
                 position = position,
                 correct = sessionCorrect,
@@ -388,7 +439,7 @@ fun LearningScreen(
                         }
                     }
                 },
-                onFinish = { mode = "home" }
+                onFinish = back
             )
 
             else -> homeMode(
@@ -441,6 +492,28 @@ fun LearningScreen(
                 onImport = { showImport = true },
                 onShowStats = onShowStats
             )
+        }
+    }
+
+    }
+    }
+    val homeBottom = LocalReservedBottom.current
+    Box(Modifier.fillMaxSize()) {
+        CoveredPage(covered = mode != "home") { page("home") {} }
+        if (mode != "home") key(mode) {
+            PredictiveBackLayer(onBack = {
+                val leavingPocket = mode == "pocket"
+                mode = "home"
+                if (leavingPocket) scope.launch {
+                    busy = true
+                    try { reload() } catch (e: Exception) { message = "读取失败：${e.message}" }
+                    finally { busy = false }
+                }
+            }, enabled = !busy && !diagnosticBusy) { back ->
+                CompositionLocalProvider(LocalReservedBottom provides if (mode == "screen") homeBottom else null) {
+                    page(mode, back)
+                }
+            }
         }
     }
 
@@ -505,28 +578,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.screeningMode(
     total: Int,
     busy: Boolean,
     lastScreened: List<Knowledge>,
-    abilityNote: String,
-    skippedKnown: Int,
-    directLearn: Int,
     onRate: (List<Knowledge>, SelfReport) -> Unit,
     onUndo: () -> Unit,
     onFinish: () -> Unit
 ) {
-    // The plan header always shows what the ability estimate is doing, even when nothing is left to
-    // ask: "0 words to judge, 4200 skipped" is the product working, not an empty screen.
-    item {
-        LearningCard("排雷范围", "只问真正需要你判断的词") {
-            Text(abilityNote, style = MaterialTheme.typography.bodyMedium)
-            if (skippedKnown + directLearn > 0) {
-                TeaMetricRow(
-                    "$skippedKnown" to "预测已认识 · 跳过",
-                    "$directLearn" to "预测陌生 · 直接学",
-                    "${upcoming.size + screened}" to "需要你判断"
-                )
-                TeaCaption("预测来自能力估计与词书先验，不是测试证据；被跳过的词仍会按抽样规则偶尔复核。")
-            }
-        }
-    }
     if (current == null) {
         item {
             TeaCard {

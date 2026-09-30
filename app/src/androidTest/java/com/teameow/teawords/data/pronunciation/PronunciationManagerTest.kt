@@ -78,6 +78,19 @@ class PronunciationManagerTest {
         assertEquals(SpeechPhase.ERROR, manager.state.value.phase)
         assertEquals("network unavailable", manager.state.value.message)
     }
+    @Test fun completedPlaybackRemainsObservableAfterShortUtterance() = withManager { manager, fake ->
+        main { manager.play("word", PronunciationDialect.US) }
+        main {
+            val id = fake.played.last().second
+            fake.event(id, SpeechPhase.PLAYING, null)
+            fake.event(id, SpeechPhase.READY, null)
+        }
+        flush()
+        assertTrue(manager.state.value.playbackCompleted)
+        assertEquals("word", manager.state.value.word)
+        main { manager.stop() }
+        assertFalse(manager.state.value.playbackCompleted)
+    }
     @Test fun failedInitializationAndLateInitAfterReleaseDoNotPlay() {
         val fake = Fake()
         lateinit var manager: PronunciationManager

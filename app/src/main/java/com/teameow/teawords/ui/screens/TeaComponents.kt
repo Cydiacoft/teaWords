@@ -9,8 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +20,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.delay
 
 /**
  * Shared Material 3 building blocks. Every page composes these so that spacing, radii,
@@ -49,10 +50,19 @@ fun TeaListPage(
     backEnabled: Boolean = true,
     navigationContent: (@Composable () -> Unit)? = null,
     floatingActionButton: (@Composable () -> Unit)? = null,
+    loading: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
     content: LazyListScope.() -> Unit
 ) {
     val reservedBottom = LocalReservedBottom.current
+    var showLoading by remember { mutableStateOf(false) }
+    LaunchedEffect(loading) {
+        if (loading) {
+            // Fast local reads should not flash a loading bar on every tab switch.
+            delay(250)
+            showLoading = true
+        } else showLoading = false
+    }
     Column(
         modifier.fillMaxSize()
             .then(
@@ -102,6 +112,10 @@ fun TeaListPage(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = if (floatingActionButton != null) 88.dp else 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content
+        )
+        // Overlay the indicator in the existing top gap so loading never moves list items.
+        if (showLoading) LinearProgressIndicator(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().height(4.dp).testTag("page-loading")
         )
         if (floatingActionButton != null) Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { floatingActionButton() }
         }

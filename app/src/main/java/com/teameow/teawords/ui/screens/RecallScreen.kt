@@ -21,12 +21,10 @@ fun RecordsView(
     var showNotebook by rememberSaveable { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         CoveredPage(covered = showNotebook) {
-            TeaListPage(title = "回望", subtitle = "查过的生词，回来巩固", navigationContent = {
+            TeaListPage(title = "回望", subtitle = "查过的生词，回来巩固", loading = loading, actions = {
                 IconButton(onClick = onSettings) { Icon(AppSymbols.Settings, "设置") }
-            }, actions = {
                 IconButton(onClick = onStats) { Icon(AppSymbols.BarChart, "学习统计") }
             }) {
-                if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 error?.let { item { TeaCaption(it) } }
                 item {
                     Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.tertiaryContainer,

@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -117,6 +118,7 @@ fun MainScreen(
     var homeLastClearedTimestamp by remember { mutableLongStateOf(preferences.homeLastClearedTimestamp) }
     var hitokotoRefreshInterval by remember { mutableIntStateOf(preferences.hitokotoRefreshInterval) }
     var bingWallpaperEnabled by remember { mutableStateOf(preferences.bingWallpaperEnabled) }
+    var predictiveBackEnabled by remember { mutableStateOf(preferences.predictiveBackEnabled) }
 
     // Initialize ClozeGenerator for review feature
     val clozeGenerator = remember { ClozeGenerator(api) }
@@ -247,6 +249,11 @@ fun MainScreen(
 
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val density = LocalDensity.current
+    val systemBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    var dockClearance by remember { mutableStateOf(80.dp + systemBottom) }
     var searchJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var lookupSucceeded by remember { mutableStateOf(false) }
     val closeLookup: () -> Unit = {
@@ -274,25 +281,33 @@ fun MainScreen(
     val pageStates = rememberSaveableStateHolder()
     val childVisible = showStats || showSettings || showReviewStats || isLookupExecuted || reviewSession != null || showLookupReview
     // Top-level destinations alone own the navigation bar. Child screens clear system insets.
-    val showDock = !childVisible && learningMode != "session" && learningMode != "diagnose"
+    val showDock = !childVisible && !keyboardVisible && learningMode != "session" && learningMode != "diagnose" && learningMode != "pocket" && learningMode != "pocketSetup"
+    val selectTab: (AppTab) -> Unit = { tab ->
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        isInputFocused = false
+        currentTab = tab
+    }
 
+    CompositionLocalProvider(LocalPredictiveBackEnabled provides predictiveBackEnabled) {
     Scaffold(
         bottomBar = {
             if (showDock) NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 tonalElevation = 0.dp,
-                modifier = Modifier.imePadding()
+                modifier = Modifier.onSizeChanged { dockClearance = with(density) { it.height.toDp() } }
             ) {
-                TeaNavItem(currentTab, AppTab.TRANSLATE, AppSymbols.Search) { currentTab = AppTab.TRANSLATE }
-                TeaNavItem(currentTab, AppTab.HISTORY, AppSymbols.Update) { currentTab = AppTab.HISTORY }
-                TeaNavItem(currentTab, AppTab.REVIEW, AppSymbols.School) { currentTab = AppTab.REVIEW }
+                TeaNavItem(currentTab, AppTab.TRANSLATE, AppSymbols.Search) { selectTab(AppTab.TRANSLATE) }
+                TeaNavItem(currentTab, AppTab.HISTORY, AppSymbols.Update) { selectTab(AppTab.HISTORY) }
+                TeaNavItem(currentTab, AppTab.REVIEW, AppSymbols.School) { selectTab(AppTab.REVIEW) }
             }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         val screen: @Composable (String, () -> Unit) -> Unit = { targetStateString, requestBack ->
           pageStates.SaveableStateProvider(targetStateString) {
-            val reservedBottomForPage: Dp? = if (showDock) innerPadding.calculateBottomPadding() else null
+            val isTopLevelPage = AppTab.entries.any { it.name == targetStateString }
+            val reservedBottomForPage: Dp? = if (isTopLevelPage && !keyboardVisible) dockClearance else null
             CompositionLocalProvider(
                 LocalReservedBottom provides reservedBottomForPage
             ) {
@@ -339,6 +354,11 @@ fun MainScreen(
                         onThemeModeChange = onThemeModeChange,
                         dynamicColor = dynamicColor,
                         onDynamicColorChange = onDynamicColorChange,
+                        predictiveBackEnabled = predictiveBackEnabled,
+                        onPredictiveBackChange = { enabled ->
+                            predictiveBackEnabled = enabled
+                            preferences.predictiveBackEnabled = enabled
+                        },
                         studyStrategy = studyStrategy,
                         onStudyStrategyChange = onStudyStrategyChange,
                         dailyNewCapOverride = dailyNewCapOverride,
@@ -371,7 +391,7 @@ fun MainScreen(
                                     onMenuClick = { focusManager.clearFocus(); showSettings = true },
                                     onPersonClick = { focusManager.clearFocus(); showStats = true },
                                     wallpaperUrl = if (bingWallpaperEnabled) bingWallpaperUrl else null,
-                                    bottomClearance = innerPadding.calculateBottomPadding()
+                                    bottomClearance = if (keyboardVisible) innerPadding.calculateBottomPadding() else dockClearance
                                 )
                         }
                     }
@@ -418,9 +438,18 @@ fun MainScreen(
                 screen(AppTab.TRANSLATE.name) { }
             }
             if (currentTab != AppTab.TRANSLATE) {
-                PredictiveBackLayer(onBack = { currentTab = AppTab.TRANSLATE }, enabled = !childVisible) { requestBack ->
-                    CoveredPage(covered = showStats || showSettings || isLookupExecuted || showLookupReview) {
-                        screen(currentTab.name, requestBack)
+                PredictiveBackLayer(onBack = { selectTab(AppTab.TRANSLATE) }, enabled = !childVisible, topLevel = true) { requestBack ->
+                    AnimatedContent(
+                        targetState = currentTab,
+                        modifier = Modifier.fillMaxSize(),
+                        transitionSpec = {
+                            val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                            (fadeIn(tween(180)) + slideInHorizontally(tween(240)) { direction * it / 20 }) togetherWith
+                                fadeOut(tween(90))
+                        },
+                        label = "main-tab"
+                    ) { tab ->
+                        CoveredPage(covered = childVisible || tab != currentTab) { screen(tab.name, requestBack) }
                     }
                 }
             }
@@ -444,6 +473,7 @@ fun MainScreen(
                 }
             }
         }
+    }
     }
 }
 

@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -19,8 +20,19 @@ data class UpdateInfo(
     val pageUrl: String,
     val publishedAt: String?,
     /** true 表示这条来自 tag 而不是正式 release，发布说明自然为空。 */
-    val fromTag: Boolean = false
+    val fromTag: Boolean = false,
+    val apk: UpdateApk? = null
 )
+
+data class UpdateApk(val name: String, val url: String, val size: Long, val sha256: String? = null)
+
+internal fun trustedUpdateUrl(raw: String, owner: String = UpdateChecker.OWNER, repo: String = UpdateChecker.REPO): Boolean {
+    val url = raw.toHttpUrlOrNull() ?: return false
+    return url.scheme == "https" && url.host == "github.com" && url.port == 443 &&
+        url.username.isEmpty() && url.password.isEmpty() &&
+        url.encodedPath.startsWith("/$owner/$repo/releases/download/") &&
+        url.encodedPath.endsWith(".apk", ignoreCase = true)
+}
 
 /**
  * 严格校验 "v1.2.3"、"1.2"、"1.2.3-beta.1"；无法解析时返回无效标记 [0]。
@@ -57,7 +69,7 @@ fun isNewerVersion(latest: String?, current: String?): Boolean {
 /**
  * 只读 GitHub 公开 API 的版本检查：
  *
- * - 不下载安装包、不自动安装、不发送任何设备或账号信息（连 token 都没有，匿名请求）。
+ * - 匿名获取公开发布信息及 APK 附件，不发送设备或账号信息。
  * - 先问 `/releases/latest`，404（仓库还没有正式发布）时退回 `/releases` 列表，再退回 `/tags`。
  * - 三者都为空时返回 `null`，由界面如实说明「仓库还没有发布版本」，而不是假装是最新版。
  */
@@ -122,7 +134,16 @@ class UpdateChecker(
             name = json.text("name"),
             notes = json.text("body"),
             pageUrl = json.text("html_url").ifBlank { repositoryPage() },
-            publishedAt = json.text("published_at").ifBlank { null }
+            publishedAt = json.text("published_at").ifBlank { null },
+            apk = json.get("assets")?.takeIf { it.isJsonArray }?.asJsonArray?.mapNotNull { element ->
+                val asset = element.asJsonObject
+                val name = asset.text("name")
+                val url = asset.text("browser_download_url")
+                val size = asset.get("size")?.takeUnless { it.isJsonNull }?.asLong ?: 0L
+                if (!name.endsWith(".apk", true) || !trustedUpdateUrl(url, owner, repo) || size <= 0) null
+                else UpdateApk(name, url, size,
+                    asset.text("digest").removePrefix("sha256:").takeIf { it.matches(Regex("[a-fA-F0-9]{64}")) })
+            }?.firstOrNull()
         )
     }
 

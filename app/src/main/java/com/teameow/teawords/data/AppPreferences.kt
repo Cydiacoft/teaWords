@@ -131,6 +131,10 @@ class AppPreferences(context: Context) {
             prefs.edit().putBoolean(KEY_DYNAMIC_COLOR, value).apply()
         }
 
+    var predictiveBackEnabled: Boolean
+        get() = prefs.getBoolean(KEY_PREDICTIVE_BACK, false)
+        set(value) { prefs.edit().putBoolean(KEY_PREDICTIVE_BACK, value).apply() }
+
     var studyStrategy: StudyStrategyPreference
         get() = StudyStrategyPreference.fromId(prefs.getString(KEY_STUDY_STRATEGY, null))
         set(value) {
@@ -161,6 +165,7 @@ class AppPreferences(context: Context) {
         private const val KEY_BING_WALLPAPER_ENABLED = "bing_wallpaper_enabled"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
+        private const val KEY_PREDICTIVE_BACK = "predictive_back_enabled"
         private const val KEY_STUDY_STRATEGY = "study_strategy"
         private const val KEY_DAILY_NEW_CAP = "daily_new_cap"
         private const val KEY_TARGET_RETENTION = "target_retention"

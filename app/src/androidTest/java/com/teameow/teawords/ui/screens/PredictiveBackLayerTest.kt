@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -20,8 +21,9 @@ class PredictiveBackLayerTest {
     private var commits = 0
     private var parentMounts = 0
 
-    private fun mount() {
+    private fun mount(predictive: Boolean = true) {
         compose.setContent {
+            CompositionLocalProvider(LocalPredictiveBackEnabled provides predictive) {
             var visible by remember { mutableStateOf(true) }
             Box(Modifier.fillMaxSize()) {
                 DisposableEffect(Unit) { parentMounts++; onDispose { } }
@@ -32,8 +34,27 @@ class PredictiveBackLayerTest {
                     }
                 }
             }
+            }
         }
         compose.waitForIdle()
+    }
+
+    @Test fun defaultBackDoesNotPreviewUntilEnabled() {
+        mount(predictive = false)
+        val before = compose.onNodeWithTag("back").fetchSemanticsNode().boundsInRoot
+        compose.runOnIdle {
+            compose.activity.onBackPressedDispatcher.dispatchOnBackStarted(
+                BackEventCompat(0f, 200f, 0f, BackEventCompat.EDGE_LEFT)
+            )
+            compose.activity.onBackPressedDispatcher.dispatchOnBackProgressed(
+                BackEventCompat(100f, 200f, 0.6f, BackEventCompat.EDGE_LEFT)
+            )
+        }
+        compose.waitForIdle()
+        assertEquals(before, compose.onNodeWithTag("back").fetchSemanticsNode().boundsInRoot)
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        assertEquals(1, commits)
     }
 
     @Test fun toolbarBackCommitsOnceAndKeepsSourceMounted() {
@@ -58,6 +79,9 @@ class PredictiveBackLayerTest {
                 BackEventCompat(100f, 200f, 0.6f, BackEventCompat.EDGE_LEFT)
             )
         }
+        compose.waitForIdle()
+        val previewed = compose.onNodeWithTag("back").fetchSemanticsNode().boundsInRoot
+        assertTrue("Enabled predictive back must scale the page during the gesture", previewed.width < before.width)
         compose.runOnIdle { compose.activity.onBackPressedDispatcher.dispatchOnBackCancelled() }
         compose.waitForIdle()
         assertEquals(0, commits)

@@ -30,8 +30,8 @@ private sealed interface UpdateOutcome {
  * 设置 → 关于App 里的「检查更新」。
  *
  * 视觉上跟「回望」「学习」的主卡一致：一整块 `secondaryContainer` 大圆角卡 + 前导圆形图标 +
- * 一个主操作，状态用一行 pill 表达。读 GitHub 公开 API 只做版本比较：不下载、不自动安装、
- * 不上传设备或账号信息；没有 release 也没有 tag 时如实说明，不谎报「已是最新」。
+ * 一个主操作，状态用一行 pill 表达。通过公开发布信息比较版本并提供下载和系统安装入口。
+ * 没有 release 也没有 tag 时如实说明，不谎报「已是最新」。
  */
 @Composable
 internal fun UpdateCheckCard(currentVersion: String, currentVersionCode: Long) {
@@ -104,6 +104,7 @@ internal fun UpdateCheckCard(currentVersion: String, currentVersionCode: Long) {
                 }
             }
 
+            UpdateDownloadBlock((outcome as? UpdateOutcome.Found)?.info, currentVersion)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -127,7 +128,7 @@ internal fun UpdateCheckCard(currentVersion: String, currentVersionCode: Long) {
             }
 
             Text(
-                "只比较版本号：不下载安装包、不自动安装、不上传任何设备信息。",
+                "点击后下载安装包；安装更新需在系统页面确认。下载可在后台继续。",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
             )
@@ -214,7 +215,7 @@ private fun NewVersionBlock(info: UpdateInfo, onOpen: () -> Unit) {
             }
             TextButton(onClick = onOpen) { Text("打开发布页") }
             Text(
-                "更新需要你手动下载安装，应用不会自动替换已安装的版本。",
+                if (info.apk == null) "此版本尚无可直接下载的 APK，请在发布页查看。" else "可直接在应用内下载，完成后确认安装即可。",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

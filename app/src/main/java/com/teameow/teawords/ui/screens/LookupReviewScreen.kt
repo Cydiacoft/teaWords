@@ -50,9 +50,8 @@ fun LookupReviewScreen(helper: DatabaseHelper, entries: List<LocalEntry>, onBack
         finally { loading = false }
     }
 
-    BackHandler { if (!busy) onBack() }
-    TeaListPage(title = "生词复习", subtitle = "巩固查过的单词", onBack = onBack, backEnabled = !busy) {
-        if (loading || busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+    BackHandler(enabled = !LocalPageBackHandled.current) { if (!busy) onBack() }
+    TeaListPage(title = "生词复习", subtitle = "巩固查过的单词", onBack = onBack, backEnabled = !busy, loading = loading || busy) {
         error?.let { item { TeaCaption(it) } }
         val current = queue.getOrNull(position)
         when {

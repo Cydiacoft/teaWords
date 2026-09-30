@@ -83,7 +83,9 @@ fun SettingsView(
     onBack: () -> Unit,
     pronunciationPreferenceReady: Boolean = true,
     pronunciationPreferenceError: String? = null,
-    onRetryPronunciationPreference: () -> Unit = {}
+    onRetryPronunciationPreference: () -> Unit = {},
+    predictiveBackEnabled: Boolean = false,
+    onPredictiveBackChange: (Boolean) -> Unit = {}
 ) {
     var currentPage by rememberSaveable { mutableStateOf(SettingsPage.Main) }
     val pageStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
@@ -116,7 +118,7 @@ fun SettingsView(
                 subtitle = when (page) {
                     SettingsPage.Main -> null
                     SettingsPage.About -> "查词、翻译，慢慢记住"
-                    SettingsPage.Update -> "只比较版本号，不自动下载或安装"
+                    SettingsPage.Update -> "下载更新，通过系统确认安装"
                     else -> "修改后自动保存"
                 },
                 onBack = back
@@ -149,6 +151,23 @@ fun SettingsView(
                         }
                     }
                     SettingsPage.Appearance -> {
+                        item {
+                            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                                Row(
+                                    Modifier.fillMaxWidth()
+                                        .toggleable(predictiveBackEnabled, role = Role.Switch, onValueChange = onPredictiveBackChange)
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text("预测性返回", style = MaterialTheme.typography.titleMedium)
+                                        TeaCaption("侧滑时预览上一页，松手返回或取消。默认关闭；手势预览需要 Android 14 及以上与系统手势导航。")
+                                    }
+                                    Switch(predictiveBackEnabled, onCheckedChange = null)
+                                }
+                            }
+                        }
                         item {
                             Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 AppThemeMode.entries.forEach { option ->

@@ -1,6 +1,9 @@
 package com.teameow.teawords.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,11 +23,19 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Velocity
 import com.teameow.teawords.data.HistoryItem
 import com.teameow.teawords.data.LexicalText
 import coil.compose.AsyncImage
@@ -44,7 +55,58 @@ fun HomeView(
     var confirmClear by rememberSaveable { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val requester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val scroll = rememberScrollState()
+    val searchFocused by rememberUpdatedState(isInputFocused)
+    val pullThreshold = with(LocalDensity.current) { 72.dp.toPx() }
+    var pullDistance by remember { mutableFloatStateOf(0f) }
+    var pulling by remember { mutableStateOf(false) }
+    val pullOffset by animateFloatAsState(
+        targetValue = pullDistance * 0.35f,
+        animationSpec = if (pulling) snap() else spring(),
+        label = "pull-down-search"
+    )
+    val pullSearch = remember(pullThreshold, scroll) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (searchFocused || source != NestedScrollSource.UserInput || pullDistance <= 0f || available.y >= 0f) return Offset.Zero
+                val consumed = available.y.coerceAtLeast(-pullDistance)
+                pullDistance += consumed
+                return Offset(0f, consumed)
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                // Only pull at the top; normal scrolling and suggestion browsing keep their gestures.
+                if (searchFocused || source != NestedScrollSource.UserInput || scroll.value != 0 || available.y <= 0f) return Offset.Zero
+                pulling = true
+                pullDistance = (pullDistance + available.y).coerceAtMost(pullThreshold * 1.5f)
+                return Offset(0f, available.y)
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (!pulling) return Velocity.Zero
+                val openSearch = pullDistance >= pullThreshold && !searchFocused
+                pulling = false
+                pullDistance = 0f
+                if (openSearch) requester.requestFocus()
+                return Velocity(0f, available.y)
+            }
+        }
+    }
+    LaunchedEffect(isInputFocused) {
+        if (isInputFocused) {
+            pulling = false
+            pullDistance = 0f
+            scroll.scrollTo(0)
+            keyboard?.show()
+        }
+    }
     val search = { focus.clearFocus(); onSearch() }
+    val exitSearch = {
+        focus.clearFocus(force = true)
+        keyboard?.hide()
+        onFocusChange(false)
+    }
     // 开启每日壁纸时它是整页背景，不再缩成一张 100dp 的小卡片——卡片只截到画面中间一小条，
     // 等于把「每日壁纸」这个功能做废。另加一层渐变遮罩，保证白字在任何一张图上都读得出来。
     val wallpaper = wallpaperUrl?.takeIf { it.isNotBlank() }
@@ -66,6 +128,8 @@ fun HomeView(
             Modifier.fillMaxSize()
                 .background(if (onWallpaper) Color.Transparent else MaterialTheme.colorScheme.surface)
                 .padding(bottom = bottomClearance)
+                .consumeWindowInsets(PaddingValues(bottom = bottomClearance))
+                .imePadding()
         ) {
             TopAppBar(title = {}, navigationIcon = {
                 IconButton(onClick = onMenuClick) { Icon(AppSymbols.Settings, "设置") }
@@ -76,12 +140,13 @@ fun HomeView(
                 navigationIconContentColor = strongColor,
                 actionIconContentColor = strongColor
             ))
-            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().nestedScroll(pullSearch)) {
                 // 先取出再把值传进 Column：Column 的内容 lambda 里隐式接收者是 ColumnScope，
                 // 直接写 maxHeight 会编译不过。
                 val topSpace = (maxHeight * .2f).coerceAtMost(156.dp)
                 Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                    Modifier.fillMaxSize().graphicsLayer { translationY = pullOffset }
+                        .verticalScroll(scroll).padding(horizontal = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Spacer(Modifier.height(if (isInputFocused) 16.dp else topSpace))
@@ -105,8 +170,16 @@ fun HomeView(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
                             .focusRequester(requester).onFocusChanged { onFocusChange(it.isFocused) },
                         placeholder = { Text("单词、中文释义或一段文字", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        leadingIcon = { Icon(AppSymbols.Search, null) },
-                        trailingIcon = if (searchQuery.isNotEmpty()) {{
+                        leadingIcon = {
+                            if (isInputFocused) IconButton(onClick = exitSearch) {
+                                Icon(AppSymbols.ArrowBack, "退出搜索")
+                            } else Icon(AppSymbols.Search, null)
+                        },
+                        trailingIcon = if (isInputFocused) {{
+                            IconButton(onClick = { onQueryChange("") }, enabled = searchQuery.isNotEmpty()) {
+                                Icon(AppSymbols.Close, "清空输入")
+                            }
+                        }} else if (searchQuery.isNotEmpty()) {{
                             IconButton(onClick = search) { Icon(AppSymbols.ArrowForward, "查询") }
                         }} else null,
                         shape = CircleShape, singleLine = true,
@@ -133,6 +206,20 @@ fun HomeView(
                         Text(homeSubtitle, style = MaterialTheme.typography.bodyMedium, color = mutedColor)
                     }
                     Spacer(Modifier.height(24.dp))
+                }
+                if (pullOffset > 1f && !isInputFocused) {
+                    Row(
+                        Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(AppSymbols.Search, null, Modifier.size(18.dp), tint = mutedColor)
+                        Text(
+                            if (pullDistance >= pullThreshold) "松开进入搜索" else "下拉进入搜索",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = mutedColor
+                        )
+                    }
                 }
                 FilledIconButton(
                     onClick = { focus.clearFocus(); recentOpen = true },

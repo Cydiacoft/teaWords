@@ -9,10 +9,29 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import android.speech.tts.TextToSpeech
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.Locale
 
 /** Real device audit: records synthesis completion separately from an explicit unavailable result. */
 class PronunciationDeviceTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    @Test fun inventoryAndLanguageSupportReportedByRealEngine() {
+        var tts: TextToSpeech? = null
+        val status = AtomicInteger(-999)
+        try {
+            compose.runOnUiThread { tts = TextToSpeech(compose.activity) { status.set(it) } }
+            compose.waitUntil(20_000) { status.get() != -999 }
+            compose.runOnUiThread {
+                val engine = tts!!
+                val audit = mapOf("status" to status.get(),
+                    "voices" to engine.voices.orEmpty().map { mapOf("name" to it.name, "locale" to it.locale.toLanguageTag(), "features" to it.features) },
+                    "ukSupport" to engine.isLanguageAvailable(Locale.UK), "usSupport" to engine.isLanguageAvailable(Locale.US),
+                    "usSelection" to engine.setLanguage(Locale.US), "selectedVoice" to engine.voice?.locale?.toLanguageTag())
+                File(compose.activity.filesDir, "speech-engine-inventory.json").writeText(Gson().toJson(audit))
+            }
+        } finally { compose.runOnUiThread { tts?.shutdown() } }
+    }
     @Test fun realEngineReportsExactRegionalVoiceAndPlaybackOutcome() {
         lateinit var manager: PronunciationManager
         compose.runOnUiThread { manager = PronunciationManager(compose.activity) }

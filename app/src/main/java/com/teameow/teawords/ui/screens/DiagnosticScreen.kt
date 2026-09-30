@@ -42,7 +42,8 @@ fun DiagnosticScreen(
     learningWords: Collection<String>? = null,
     wordTags: Map<String, String> = emptyMap(),
     onBack: () -> Unit,
-    onFinished: () -> Unit = {}
+    onFinished: () -> Unit = {},
+    onBusyChange: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val repo = remember(dbHelper) { SenseRepository(dbHelper) }
@@ -54,6 +55,8 @@ fun DiagnosticScreen(
     var loading by remember { mutableStateOf(true) }
     var message by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    LaunchedEffect(busy) { onBusyChange(busy) }
+    DisposableEffect(Unit) { onDispose { onBusyChange(false) } }
     /** Rows the app itself can read back, so a persistence failure is visible instead of silent. */
     var storedEvidence by remember { mutableStateOf(0) }
     var startedAt by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
@@ -128,13 +131,14 @@ fun DiagnosticScreen(
         current = null
     }
 
-    BackHandler(enabled = true) {
+    BackHandler(enabled = !LocalPageBackHandled.current) {
         if (busy) return@BackHandler
         if (!state.isFinished) abilityStore.save(state.ability)
         onBack()
     }
 
     TeaListPage(
+        loading = loading,
         title = "词汇能力诊断",
         subtitle = "自适应选题 · 答对更难的问题会更快定位水平",
         onBack = onBack,
@@ -147,7 +151,6 @@ fun DiagnosticScreen(
             }
         }
     ) {
-        if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         message?.let { item { TeaCaption(it) } }
 
         item {

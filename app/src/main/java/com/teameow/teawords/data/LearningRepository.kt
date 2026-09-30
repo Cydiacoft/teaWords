@@ -108,17 +108,21 @@ class LearningRepository(private val helper: DatabaseHelper) {
     fun saveReview(
         state: Knowledge, verdict: com.teameow.teawords.algorithm.ReviewVerdict,
         wordId: Long, senseId: Long, correct: Boolean, revealed: Boolean,
-        elapsed: Long, now: Long, abilityBefore: Double
+        elapsed: Long, now: Long, abilityBefore: Double, mode: String = "RECALL"
     ): Knowledge {
-        val updated = LearningEngine.answer(state, correct && !revealed, now).copy(
+        val answered = LearningEngine.answer(state, correct && !revealed, now)
+        val updated = answered.copy(
             intervalHours = verdict.intervalDays?.times(24.0) ?: state.intervalHours,
-            due = verdict.dueAt ?: state.due
+            due = verdict.dueAt ?: state.due,
+            streak = if (mode.startsWith("POCKET_")) {
+                if (correct || mode == "POCKET_STUDY") state.streak else 0
+            } else answered.streak
         )
         val database = helper.writableDatabase
         database.beginTransaction()
         try {
             SenseRepository(helper).recordReview(
-                wordId = wordId, senseId = senseId, word = state.word, mode = "RECALL",
+                wordId = wordId, senseId = senseId, word = state.word, mode = mode,
                 correct = correct, revealed = revealed, elapsedMillis = elapsed, now = now,
                 grade = verdict.grade.ordinal, difficulty = verdict.memory.difficulty,
                 stability = verdict.memory.stability, dueAt = verdict.dueAt,
@@ -137,7 +141,7 @@ class LearningRepository(private val helper: DatabaseHelper) {
 
     /** Count first study days across all books; switching books cannot reset the new-word budget. */
     fun newWordsSince(since: Long): Int = helper.readableDatabase.rawQuery(
-        "SELECT COUNT(*) FROM (SELECT word FROM learning_events WHERE kind='test' " +
+        "SELECT COUNT(*) FROM (SELECT word FROM learning_events WHERE kind IN ('test','study') " +
             "AND (mode IS NULL OR mode <> 'DIAGNOSTIC') GROUP BY word HAVING MIN(timestamp)>=CAST(? AS INTEGER))",
         arrayOf(since.toString())
     ).use { it.moveToFirst(); it.getInt(0) }
@@ -146,12 +150,12 @@ class LearningRepository(private val helper: DatabaseHelper) {
     data class Daily(val day: String, val tests: Int, val correct: Int, val seconds: Long)
 
     fun daily(since: Long): List<Daily> = helper.readableDatabase.rawQuery(
-        "SELECT date(timestamp/1000,'unixepoch','localtime') d, COUNT(correct), COALESCE(SUM(correct),0), COALESCE(SUM(elapsed),0)/1000 FROM learning_events WHERE timestamp>=? AND kind='test' GROUP BY d ORDER BY d", arrayOf(since.toString())
+        "SELECT date(timestamp/1000,'unixepoch','localtime') d, COUNT(correct), COALESCE(SUM(correct),0), COALESCE(SUM(elapsed),0)/1000 FROM learning_events WHERE timestamp>=? AND kind IN ('test','study') GROUP BY d ORDER BY d", arrayOf(since.toString())
     ).use { c -> buildList { while (c.moveToNext()) add(Daily(c.getString(0), c.getInt(1), c.getInt(2), c.getLong(3))) } }
 
     /** Distinct days with at least one persisted answer, newest first. */
     fun activeDays(limit: Int = 400): List<String> = helper.readableDatabase.rawQuery(
-        "SELECT DISTINCT date(timestamp/1000,'unixepoch','localtime') d FROM learning_events WHERE kind='test' ORDER BY d DESC LIMIT ?", arrayOf(limit.toString())
+        "SELECT DISTINCT date(timestamp/1000,'unixepoch','localtime') d FROM learning_events WHERE kind IN ('test','study') ORDER BY d DESC LIMIT ?", arrayOf(limit.toString())
     ).use { c -> buildList { while (c.moveToNext()) add(c.getString(0)) } }
 
     /**
@@ -247,6 +251,7 @@ class LearningRepository(private val helper: DatabaseHelper) {
             "SELECT date(timestamp/1000,'unixepoch','localtime') d, COUNT(*) FROM (" +
                 "SELECT k.word, MAX(e.timestamp) timestamp FROM learning_knowledge k " +
                 "JOIN learning_events e ON e.word = k.word AND e.kind='test' AND e.correct=1 " +
+                "AND (e.mode IS NULL OR e.mode NOT LIKE 'POCKET_%') " +
                 "WHERE k.streak >= ? GROUP BY k.word) WHERE timestamp >= ? GROUP BY d",
             arrayOf(threshold.toString(), since.toString())
         ).use { c -> buildMap { while (c.moveToNext()) put(c.getString(0), c.getInt(1)) } }

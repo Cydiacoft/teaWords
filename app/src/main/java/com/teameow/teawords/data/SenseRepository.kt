@@ -322,7 +322,11 @@ class SenseRepository(private val helper: DatabaseHelper) {
         db.beginTransaction()
         try {
             val current = knowledgeFor(listOf(senseId))[senseId] ?: SenseKnowledge.unseen(senseId)
-            val streak = if (correct && !revealed) current.correctStreak + 1 else 0
+            val streak = when {
+                mode.startsWith("POCKET_") -> if (correct || mode == "POCKET_STUDY") current.correctStreak else 0
+                correct && !revealed -> current.correctStreak + 1
+                else -> 0
+            }
             val attempts = current.attempts + 1
             // A revealed answer or a miss is not evidence of knowledge, but both are recorded.
             val values = ContentValues().apply {
@@ -372,8 +376,8 @@ class SenseRepository(private val helper: DatabaseHelper) {
                 "learning_events", null,
                 ContentValues().apply {
                     put("word", word)
-                    put("kind", "test")
-                    put("correct", if (correct) 1 else 0)
+                    put("kind", if (mode == "POCKET_STUDY") "study" else "test")
+                    if (mode == "POCKET_STUDY") putNull("correct") else put("correct", if (correct) 1 else 0)
                     put("elapsed", elapsedMillis.coerceIn(0, 300_000))
                     put("timestamp", now)
                     put("sense_id", senseId)

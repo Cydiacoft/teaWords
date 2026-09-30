@@ -9,6 +9,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UpdateCheckerResponseTest {
+    @Test fun `release APK includes download size and checksum`() = runBlocking {
+        val digest = "a".repeat(64)
+        val info = checker(mapOf("/releases/latest" to (200 to """{
+            "tag_name":"v1.2.0","assets":[
+                {"name":"notes.txt","browser_download_url":"https://example.com/notes","size":100},
+                {"name":"teaWords-1.2.0.apk","browser_download_url":"https://github.com/Cydiacoft/teaWords/releases/download/v1.2.0/teaWords-1.2.0.apk","size":1234,"digest":"sha256:$digest"}
+            ]}"""))).latest().getOrThrow()!!
+        assertEquals(1234L, info.apk!!.size)
+        assertEquals(digest, info.apk!!.sha256)
+    }
+    @Test fun `external APK and nullable assets cannot create a download`() = runBlocking {
+        for (assets in listOf("null", """[{"name":"update.apk","browser_download_url":"https://example.com/update.apk","size":1234}]""")) {
+            val info = checker(mapOf("/releases/latest" to (200 to """{"tag_name":"v1.2.0","assets":$assets}"""))).latest().getOrThrow()!!
+            assertNull(info.apk)
+        }
+        assertFalse(trustedUpdateUrl("http://github.com/Cydiacoft/teaWords/releases/download/v1.2.0/update.apk"))
+        assertFalse(trustedUpdateUrl("https://github.com/another/project/releases/download/v1.2.0/update.apk"))
+    }
     private fun checker(responses: Map<String, Pair<Int, String>>) = UpdateChecker(
         OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()

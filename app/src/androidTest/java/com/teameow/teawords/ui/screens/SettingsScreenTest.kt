@@ -23,6 +23,7 @@ class SettingsScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private var mode by mutableStateOf(AppThemeMode.SYSTEM)
     private var books by mutableStateOf(setOf("cet4"))
+    private var predictiveBack by mutableStateOf(false)
 
     private fun launch(compact: Boolean = false) {
         compose.setContent {
@@ -54,12 +55,23 @@ class SettingsScreenTest {
                             studyStrategy = strategy, onStudyStrategyChange = { strategy = it },
                             dailyNewCapOverride = cap, onDailyNewCapChange = { cap = it },
                             targetRetentionOverride = retention, onTargetRetentionChange = { retention = it },
-                            onBack = {}
+                            onBack = {}, predictiveBackEnabled = predictiveBack,
+                            onPredictiveBackChange = { predictiveBack = it }
                         )
                     }
                 }
             }
         }
+    }
+
+    @Test fun predictiveBackIsOffByDefaultAndCanBeEnabledInAppearance() {
+        launch()
+        compose.onNodeWithText("外观模式").performClick()
+        compose.onNode(hasText("预测性返回") and isToggleable()).assertIsOff().performClick().assertIsOn()
+        compose.runOnIdle { assertTrue(predictiveBack) }
+        compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithText("外观模式").performClick()
+        compose.onNode(hasText("预测性返回") and isToggleable()).assertIsOn()
     }
 
     @Test fun appearanceChangeAndNestedBackKeepSettingsUsable() {
@@ -70,7 +82,8 @@ class SettingsScreenTest {
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("个性化").assertIsDisplayed()
         compose.onNodeWithText("深色 · Purple").assertIsDisplayed()
-        compose.onNodeWithText("关于茶词").performScrollTo().performClick()
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于茶词"))
+        compose.onNodeWithText("关于茶词").performClick()
         compose.onNodeWithText("茶词 · teaWords").assertIsDisplayed()
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("teaMeow Technology"))
         compose.onNodeWithText("teaMeow Technology").assertIsDisplayed()

@@ -8,7 +8,11 @@
 
 当前版本 **1.1.0**（versionCode 2），适用于 Android 7.0 及以上。
 
-从 [GitHub Releases](https://github.com/Cydiacoft/teaWords/releases/latest) 下载已签名的 `teaWords-1.1.0.apk`。无需下载翻译模型即可使用默认在线翻译；更新记录见 [CHANGELOG](CHANGELOG.md)。
+从 [GitHub Releases](https://github.com/Cydiacoft/teaWords/releases/latest) 下载已签名的 `teaWords-1.2.0.apk`。无需下载翻译模型即可使用默认在线翻译；更新记录见 [CHANGELOG](CHANGELOG.md)。
+
+1.2.0 起，设置中的“检查更新”支持直接下载 APK，显示后台下载进度并在完成后打开系统安装确认。首次安装需允许茶词安装应用；发布包会校验版本、校验和及签名，使用相同发布签名更新可保留数据。
+
+学习页新增“随手练一小轮”：点开始后可选词数或自定义 1–100 个词，混合词义、听音、配对、拼写填空及现有例句的语境题。实际词数受可用词条和每日新词额度影响；暂停后继续原轮次。
 
 ## 开发入口
 

@@ -20,7 +20,8 @@ data class PronunciationState(
     val voices: Map<PronunciationDialect, SpeechVoice> = emptyMap(),
     val word: String? = null,
     val dialect: PronunciationDialect? = null,
-    val message: String? = null
+    val message: String? = null,
+    val playbackCompleted: Boolean = false
 )
 
 /** Backend boundary permits deterministic tests without depending on device voice downloads. */
@@ -80,7 +81,8 @@ class PronunciationManager(private val backend: SpeechBackend) : AutoCloseable {
                             if (phase == SpeechPhase.ERROR) {
                                 runCatching { backend.stop() }
                                 fail(error ?: "发音失败，请检查对应口音的语音资源")
-                            } else mutable.value = mutable.value.copy(phase = SpeechPhase.READY, message = null)
+                            } else mutable.value = mutable.value.copy(phase = SpeechPhase.READY, message = null,
+                                playbackCompleted = phase == SpeechPhase.READY)
                         }
                     }
                 }
@@ -124,7 +126,8 @@ class PronunciationManager(private val backend: SpeechBackend) : AutoCloseable {
             activeId = id
             mutable.value = mutable.value.copy(
                 phase = SpeechPhase.QUEUED, voices = mutable.value.voices + (dialect to voice),
-                message = if (voice.networkRequired) "正在使用联网合成语音" else "正在使用本地合成语音"
+                message = if (voice.networkRequired) "正在使用联网合成语音" else "正在使用本地合成语音",
+                playbackCompleted = false
             )
             armTimeout(30_000) {
                 activeId = null
@@ -150,9 +153,9 @@ class PronunciationManager(private val backend: SpeechBackend) : AutoCloseable {
         // Leaving an Activity while initialization is pending must not remove its watchdog.
         if (ready || hadUtterance) cancelTimeout()
         runCatching { backend.stop() }
-        if (!closed && ready) mutable.value = mutable.value.copy(phase = SpeechPhase.READY, word = null, dialect = null, message = null)
+        if (!closed && ready) mutable.value = mutable.value.copy(phase = SpeechPhase.READY, word = null, dialect = null, message = null, playbackCompleted = false)
     }
-    private fun fail(message: String) { mutable.value = mutable.value.copy(phase = SpeechPhase.ERROR, message = message) }
+    private fun fail(message: String) { mutable.value = mutable.value.copy(phase = SpeechPhase.ERROR, message = message, playbackCompleted = false) }
     private fun cancelTimeout() { timeout?.let(handler::removeCallbacks); timeout = null }
     private fun armTimeout(delay: Long, action: () -> Unit) {
         cancelTimeout()
@@ -210,16 +213,18 @@ private class AndroidSpeechBackend(private val context: Context) : SpeechBackend
     }
 
     override fun voices(): List<SpeechVoice> = engine?.voices.orEmpty().map {
-        SpeechVoice(it.name, it.locale, it.isNetworkConnectionRequired,
+        SpeechVoice(it.name, reportedVoiceLocale(it.name, it.locale, it.features.orEmpty()), it.isNetworkConnectionRequired,
             TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in it.features.orEmpty(), it.quality, it.latency)
     }
 
     override fun select(voice: SpeechVoice): Boolean {
         val tts = engine ?: return false
-        val actual = tts.voices?.firstOrNull { it.name == voice.name && it.locale == voice.locale } ?: return false
+        val actual = tts.voices?.firstOrNull { it.name == voice.name &&
+            reportedVoiceLocale(it.name, it.locale, it.features.orEmpty()) == voice.locale } ?: return false
         if (tts.setVoice(actual) != TextToSpeech.SUCCESS) return false
         // Engines must confirm the requested voice; success alone is not proof of accent.
-        return tts.voice?.let { it.name == actual.name && it.locale.language == voice.locale.language && it.locale.country == voice.locale.country } == true
+        return tts.voice?.let { it.name == actual.name &&
+            reportedVoiceLocale(it.name, it.locale, it.features.orEmpty()) == voice.locale } == true
     }
 
     override fun speak(word: String, id: String): Boolean {
