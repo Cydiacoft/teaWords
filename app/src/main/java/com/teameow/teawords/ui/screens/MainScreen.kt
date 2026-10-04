@@ -117,7 +117,8 @@ fun MainScreen(
     var homeSubtitleMode by remember { mutableStateOf(preferences.homeSubtitleMode) }
     var homeLastClearedTimestamp by remember { mutableLongStateOf(preferences.homeLastClearedTimestamp) }
     var hitokotoRefreshInterval by remember { mutableIntStateOf(preferences.hitokotoRefreshInterval) }
-    var bingWallpaperEnabled by remember { mutableStateOf(preferences.bingWallpaperEnabled) }
+    var homeWallpaperMode by remember { mutableStateOf(preferences.homeWallpaperMode) }
+    var customWallpaperUri by remember { mutableStateOf(preferences.customWallpaperUri) }
     var predictiveBackEnabled by remember { mutableStateOf(preferences.predictiveBackEnabled) }
 
     // Initialize ClozeGenerator for review feature
@@ -186,8 +187,8 @@ fun MainScreen(
     var bingWallpaperUrl by remember { mutableStateOf<String?>(null) }
 
     // Fetch Bing Wallpaper
-    LaunchedEffect(bingWallpaperEnabled) {
-        if (bingWallpaperEnabled) {
+    LaunchedEffect(homeWallpaperMode) {
+        if (homeWallpaperMode == HomeWallpaperMode.DAILY) {
             withContext(kotlinx.coroutines.Dispatchers.IO) {
                 try {
                     val client = okhttp3.OkHttpClient()
@@ -279,9 +280,10 @@ fun MainScreen(
         isInputFocused = false
     }
     val pageStates = rememberSaveableStateHolder()
-    val childVisible = showStats || showSettings || showReviewStats || isLookupExecuted || reviewSession != null || showLookupReview
+    // The settings sheet is a dialog over the unchanged home page; keep the dock mounted behind it.
+    val childVisible = showReviewStats || isLookupExecuted || reviewSession != null || showLookupReview
     // Top-level destinations alone own the navigation bar. Child screens clear system insets.
-    val showDock = !childVisible && !keyboardVisible && learningMode != "session" && learningMode != "diagnose" && learningMode != "pocket" && learningMode != "pocketSetup"
+    val showDock = !childVisible && !isInputFocused && !keyboardVisible && learningMode != "session" && learningMode != "diagnose" && learningMode != "pocket" && learningMode != "pocketSetup"
     val selectTab: (AppTab) -> Unit = { tab ->
         focusManager.clearFocus()
         keyboardController?.hide()
@@ -291,19 +293,8 @@ fun MainScreen(
 
     CompositionLocalProvider(LocalPredictiveBackEnabled provides predictiveBackEnabled) {
     Scaffold(
-        bottomBar = {
-            if (showDock) NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 0.dp,
-                modifier = Modifier.onSizeChanged { dockClearance = with(density) { it.height.toDp() } }
-            ) {
-                TeaNavItem(currentTab, AppTab.TRANSLATE, AppSymbols.Search) { selectTab(AppTab.TRANSLATE) }
-                TeaNavItem(currentTab, AppTab.HISTORY, AppSymbols.Update) { selectTab(AppTab.HISTORY) }
-                TeaNavItem(currentTab, AppTab.REVIEW, AppSymbols.School) { selectTab(AppTab.REVIEW) }
-            }
-        },
         containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
+    ) { _ ->
         val screen: @Composable (String, () -> Unit) -> Unit = { targetStateString, requestBack ->
           pageStates.SaveableStateProvider(targetStateString) {
             val isTopLevelPage = AppTab.entries.any { it.name == targetStateString }
@@ -313,14 +304,30 @@ fun MainScreen(
             ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 when (targetStateString) {
-                    "stats" -> StatsDashboard(dbHelper = dbHelper, onBack = requestBack)
+                    "stats" -> {
+                        val statsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                        val statsClose: () -> Unit = { scope.launch { statsSheetState.hide(); requestBack() } }
+                        val sheetHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 72.dp)
+                            .coerceIn(320.dp, 800.dp)
+                        ModalBottomSheet(
+                            onDismissRequest = requestBack,
+                            sheetState = statsSheetState,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                        ) {
+                            Box(Modifier.fillMaxWidth().height(sheetHeight)) {
+                                StatsDashboard(dbHelper = dbHelper, onBack = statsClose)
+                            }
+                        }
+                    }
                     "settings" -> SettingsView(
                         pronunciationDialect = pronunciationDialect,
                         selectedWordbookIds = selectedWordbookIds,
                         homeTitle = homeTitle,
                         homeSubtitle = homeSubtitle,
                         homeSubtitleMode = homeSubtitleMode,
-                        bingWallpaperEnabled = bingWallpaperEnabled,
+                        homeWallpaperMode = homeWallpaperMode,
+                        customWallpaperUri = customWallpaperUri,
                         onPronunciationDialectChange = pronunciationServices::setDefault,
                         pronunciationPreferenceReady = pronunciationPreference.dialect != null,
                         pronunciationPreferenceError = pronunciationPreference.error,
@@ -341,9 +348,15 @@ fun MainScreen(
                             homeSubtitleMode = mode
                             preferences.homeSubtitleMode = mode
                         },
-                        onBingWallpaperEnabledChange = { enabled ->
-                            bingWallpaperEnabled = enabled
-                            preferences.bingWallpaperEnabled = enabled
+                        onHomeWallpaperModeChange = { mode ->
+                            homeWallpaperMode = mode
+                            preferences.homeWallpaperMode = mode
+                        },
+                        onCustomWallpaperUriChange = { uri ->
+                            customWallpaperUri = uri
+                            preferences.customWallpaperUri = uri
+                            homeWallpaperMode = if (uri == null) HomeWallpaperMode.NONE else HomeWallpaperMode.CUSTOM
+                            preferences.homeWallpaperMode = homeWallpaperMode
                         },
                         hitokotoRefreshInterval = hitokotoRefreshInterval,
                         onHitokotoRefreshIntervalChange = { interval ->
@@ -390,8 +403,12 @@ fun MainScreen(
                                     },
                                     onMenuClick = { focusManager.clearFocus(); showSettings = true },
                                     onPersonClick = { focusManager.clearFocus(); showStats = true },
-                                    wallpaperUrl = if (bingWallpaperEnabled) bingWallpaperUrl else null,
-                                    bottomClearance = if (keyboardVisible) innerPadding.calculateBottomPadding() else dockClearance
+                                    wallpaperUrl = when (homeWallpaperMode) {
+                                        HomeWallpaperMode.NONE -> null
+                                        HomeWallpaperMode.DAILY -> bingWallpaperUrl
+                                        HomeWallpaperMode.CUSTOM -> customWallpaperUri
+                                    },
+                                    bottomClearance = if (isInputFocused || keyboardVisible) 0.dp else dockClearance
                                 )
                         }
                     }
@@ -434,11 +451,11 @@ fun MainScreen(
         }
         }
         Box(Modifier.fillMaxSize()) {
-            CoveredPage(covered = currentTab != AppTab.TRANSLATE || childVisible) {
+            CoveredPage(covered = currentTab != AppTab.TRANSLATE || childVisible || showSettings || showStats) {
                 screen(AppTab.TRANSLATE.name) { }
             }
             if (currentTab != AppTab.TRANSLATE) {
-                PredictiveBackLayer(onBack = { selectTab(AppTab.TRANSLATE) }, enabled = !childVisible, topLevel = true) { requestBack ->
+                PredictiveBackLayer(onBack = { selectTab(AppTab.TRANSLATE) }, enabled = !childVisible && !showSettings && !showStats, topLevel = true) { requestBack ->
                     AnimatedContent(
                         targetState = currentTab,
                         modifier = Modifier.fillMaxSize(),
@@ -449,9 +466,21 @@ fun MainScreen(
                         },
                         label = "main-tab"
                     ) { tab ->
-                        CoveredPage(covered = childVisible || tab != currentTab) { screen(tab.name, requestBack) }
+                        CoveredPage(covered = childVisible || showSettings || showStats || tab != currentTab) { screen(tab.name, requestBack) }
                     }
                 }
+            }
+            if (showDock) NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(
+                    alpha = if (currentTab == AppTab.TRANSLATE && homeWallpaperMode != HomeWallpaperMode.NONE) 0.68f else 1f
+                ),
+                tonalElevation = 0.dp,
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .onSizeChanged { dockClearance = with(density) { it.height.toDp() } }
+            ) {
+                TeaNavItem(currentTab, AppTab.TRANSLATE, AppSymbols.Search) { selectTab(AppTab.TRANSLATE) }
+                TeaNavItem(currentTab, AppTab.HISTORY, AppSymbols.Update) { selectTab(AppTab.HISTORY) }
+                TeaNavItem(currentTab, AppTab.REVIEW, AppSymbols.School) { selectTab(AppTab.REVIEW) }
             }
             val overlay = when {
                 showStats -> "stats"
@@ -462,14 +491,17 @@ fun MainScreen(
             }
             if (overlay != null) {
                 key(overlay) {
-                    PredictiveBackLayer(enabled = !lookupReviewBusy, onBack = {
-                        when (overlay) {
-                            "stats" -> showStats = false
-                            "settings" -> showSettings = false
-                            "lookup-review" -> showLookupReview = false
-                            else -> closeLookup()
-                        }
-                    }) { requestBack -> screen(overlay, requestBack) }
+                    if (overlay == "settings" || overlay == "stats") {
+                        screen(overlay) { if (overlay == "settings") showSettings = false else showStats = false }
+                    } else {
+                        PredictiveBackLayer(enabled = !lookupReviewBusy, onBack = {
+                            when (overlay) {
+                                "stats" -> showStats = false
+                                "lookup-review" -> showLookupReview = false
+                                else -> closeLookup()
+                            }
+                        }) { requestBack -> screen(overlay, requestBack) }
+                    }
                 }
             }
         }

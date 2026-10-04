@@ -30,7 +30,8 @@ class SettingsScreenTest {
             var title by remember { mutableStateOf("茶词") }
             var subtitle by remember { mutableStateOf("专注翻译，见字如面") }
             var subtitleMode by remember { mutableStateOf(SubtitleMode.CUSTOM) }
-            var wallpaper by remember { mutableStateOf(true) }
+            var wallpaperMode by remember { mutableStateOf(HomeWallpaperMode.DAILY) }
+            var customWallpaperUri by remember { mutableStateOf<String?>(null) }
             var dialect by remember { mutableStateOf(PronunciationDialect.US) }
             var strategy by remember { mutableStateOf(StudyStrategyPreference.BALANCED) }
             var cap by remember { mutableIntStateOf(0) }
@@ -46,10 +47,13 @@ class SettingsScreenTest {
                         SettingsView(
                             pronunciationDialect = dialect, selectedWordbookIds = books,
                             homeTitle = title, homeSubtitle = subtitle, homeSubtitleMode = subtitleMode,
-                            bingWallpaperEnabled = wallpaper, hitokotoRefreshInterval = 5, themeMode = mode,
+                            homeWallpaperMode = wallpaperMode, customWallpaperUri = customWallpaperUri,
+                            hitokotoRefreshInterval = 5, themeMode = mode,
                             onPronunciationDialectChange = { dialect = it }, onSelectedWordbooksChange = { books = it },
                             onHomeTitleChange = { title = it }, onHomeSubtitleChange = { subtitle = it },
-                            onHomeSubtitleModeChange = { subtitleMode = it }, onBingWallpaperEnabledChange = { wallpaper = it },
+                            onHomeSubtitleModeChange = { subtitleMode = it },
+                            onHomeWallpaperModeChange = { wallpaperMode = it },
+                            onCustomWallpaperUriChange = { customWallpaperUri = it },
                             onHitokotoRefreshIntervalChange = {}, onThemeModeChange = { mode = it },
                             dynamicColor = false, onDynamicColorChange = {},
                             studyStrategy = strategy, onStudyStrategyChange = { strategy = it },
@@ -81,9 +85,9 @@ class SettingsScreenTest {
         compose.runOnIdle { assertEquals(AppThemeMode.DARK, mode) }
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("个性化").assertIsDisplayed()
-        compose.onNodeWithText("深色 · Purple").assertIsDisplayed()
-        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于茶词"))
-        compose.onNodeWithText("关于茶词").performClick()
+        compose.onNodeWithText("深色").assertIsDisplayed()
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于App"))
+        compose.onNodeWithText("关于App").performClick()
         compose.onNodeWithText("茶词 · teaWords").assertIsDisplayed()
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("teaMeow Technology"))
         compose.onNodeWithText("teaMeow Technology").assertIsDisplayed()

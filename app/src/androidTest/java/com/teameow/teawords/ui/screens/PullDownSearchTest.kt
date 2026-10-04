@@ -58,13 +58,14 @@ class PullDownSearchTest {
     @Test fun shortPullReturnsHomeWithoutFocusingSearch() {
         showHome()
         pull(36f)
-        compose.onNode(hasSetTextAction()).assertIsNotFocused()
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
         compose.onNodeWithText("茶词").assertIsDisplayed()
         compose.onNodeWithText("下拉进入搜索").assertDoesNotExist()
     }
 
     @Test fun clearButtonKeepsSearchFocused() {
         showHome()
+        compose.onNodeWithContentDescription("打开下拉搜索").performClick()
         compose.onNode(hasSetTextAction()).performClick().performTextInput("hello")
         compose.onNodeWithContentDescription("清空输入").performClick()
         compose.onNode(hasSetTextAction())
@@ -75,9 +76,12 @@ class PullDownSearchTest {
 
     @Test fun backArrowExitsSearchWithoutClearingQuery() {
         showHome()
+        compose.onNodeWithContentDescription("打开下拉搜索").performClick()
         compose.onNode(hasSetTextAction()).performClick().performTextInput("hello")
         compose.onNodeWithContentDescription("退出搜索").performClick()
-        compose.onNode(hasSetTextAction()).assertTextEquals("hello").assertIsNotFocused()
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
         compose.onNodeWithText("茶词").assertIsDisplayed()
+        compose.onNodeWithContentDescription("打开下拉搜索").performClick()
+        compose.onNode(hasSetTextAction()).assertTextEquals("hello").assertIsFocused()
     }
 }

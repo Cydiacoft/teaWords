@@ -22,8 +22,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -53,11 +52,13 @@ fun HomeView(
 ) {
     var recentOpen by rememberSaveable { mutableStateOf(false) }
     var confirmClear by rememberSaveable { mutableStateOf(false) }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var inputEverFocused by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val requester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val scroll = rememberScrollState()
-    val searchFocused by rememberUpdatedState(isInputFocused)
+    val searchFocused by rememberUpdatedState(isInputFocused || searchOpen)
     val pullThreshold = with(LocalDensity.current) { 72.dp.toPx() }
     var pullDistance by remember { mutableFloatStateOf(0f) }
     var pulling by remember { mutableStateOf(false) }
@@ -88,45 +89,54 @@ fun HomeView(
                 val openSearch = pullDistance >= pullThreshold && !searchFocused
                 pulling = false
                 pullDistance = 0f
-                if (openSearch) requester.requestFocus()
+                if (openSearch) {
+                    onFocusChange(true)
+                    searchOpen = true
+                }
                 return Velocity(0f, available.y)
             }
         }
     }
-    LaunchedEffect(isInputFocused) {
-        if (isInputFocused) {
+    LaunchedEffect(searchOpen) {
+        if (searchOpen) {
             pulling = false
             pullDistance = 0f
             scroll.scrollTo(0)
+            requester.requestFocus()
             keyboard?.show()
         }
     }
     val search = { focus.clearFocus(); onSearch() }
     val exitSearch = {
+        inputEverFocused = false
         focus.clearFocus(force = true)
         keyboard?.hide()
+        searchOpen = false
         onFocusChange(false)
     }
     // 开启每日壁纸时它是整页背景，不再缩成一张 100dp 的小卡片——卡片只截到画面中间一小条，
     // 等于把「每日壁纸」这个功能做废。另加一层渐变遮罩，保证白字在任何一张图上都读得出来。
     val wallpaper = wallpaperUrl?.takeIf { it.isNotBlank() }
     val onWallpaper = wallpaper != null
-    val strongColor = if (onWallpaper) Color.White else MaterialTheme.colorScheme.onSurface
-    val mutedColor = if (onWallpaper) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val lightPalette = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    val wallpaperForeground = if (lightPalette) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
+    val wallpaperScrim = if (lightPalette) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surface
+    val strongColor = if (onWallpaper) wallpaperForeground else MaterialTheme.colorScheme.onSurface
+    val mutedColor = if (onWallpaper) wallpaperForeground.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
     Box(Modifier.fillMaxSize()) {
         if (wallpaper != null) {
             AsyncImage(wallpaper, "每日壁纸", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.45f), Color.Black.copy(alpha = 0.22f), Color.Black.copy(alpha = 0.55f))
-                    )
+                    Brush.verticalGradient(0f to wallpaperScrim.copy(alpha = 0.16f),
+                        0.55f to wallpaperScrim.copy(alpha = 0f),
+                        1f to wallpaperScrim.copy(alpha = 0.38f))
                 )
             )
         }
         Column(
             Modifier.fillMaxSize()
-                .background(if (onWallpaper) Color.Transparent else MaterialTheme.colorScheme.surface)
+                .background(if (onWallpaper) MaterialTheme.colorScheme.surface.copy(alpha = 0f) else MaterialTheme.colorScheme.surface)
                 .padding(bottom = bottomClearance)
                 .consumeWindowInsets(PaddingValues(bottom = bottomClearance))
                 .imePadding()
@@ -136,78 +146,79 @@ fun HomeView(
             }, actions = {
                 IconButton(onClick = onPersonClick) { Icon(AppSymbols.BarChart, "学习统计") }
             }, colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = if (onWallpaper) Color.Transparent else MaterialTheme.colorScheme.surface,
+                containerColor = if (onWallpaper) MaterialTheme.colorScheme.surface.copy(alpha = 0f) else MaterialTheme.colorScheme.surface,
                 navigationIconContentColor = strongColor,
                 actionIconContentColor = strongColor
             ))
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().nestedScroll(pullSearch)) {
-                // 先取出再把值传进 Column：Column 的内容 lambda 里隐式接收者是 ColumnScope，
-                // 直接写 maxHeight 会编译不过。
-                val topSpace = (maxHeight * .2f).coerceAtMost(156.dp)
-                Column(
-                    Modifier.fillMaxSize().graphicsLayer { translationY = pullOffset }
-                        .verticalScroll(scroll).padding(horizontal = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                val viewportHeight = maxHeight
+                val suggestionMaxHeight = (maxHeight - 80.dp).coerceAtLeast(72.dp)
+                if (!searchOpen && !isInputFocused) Column(
+                    Modifier.fillMaxSize().verticalScroll(scroll)
                 ) {
-                    Spacer(Modifier.height(if (isInputFocused) 16.dp else topSpace))
-                    if (!isInputFocused) {
-                        FilledTonalIconButton(
-                            onClick = { requester.requestFocus() },
-                            modifier = Modifier.size(56.dp),
-                            colors = if (onWallpaper) IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color.White.copy(alpha = 0.22f),
-                                contentColor = Color.White
-                            ) else IconButtonDefaults.filledTonalIconButtonColors()
-                        ) {
-                            Icon(AppSymbols.Search, "输入要查询的内容", Modifier.size(28.dp))
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        Text(homeTitle.ifBlank { "茶词" }, style = MaterialTheme.typography.headlineMedium, color = strongColor)
-                        Spacer(Modifier.height(24.dp))
-                    }
-                    TextField(
-                        value = searchQuery, onValueChange = onQueryChange,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
-                            .focusRequester(requester).onFocusChanged { onFocusChange(it.isFocused) },
-                        placeholder = { Text("单词、中文释义或一段文字", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        leadingIcon = {
-                            if (isInputFocused) IconButton(onClick = exitSearch) {
-                                Icon(AppSymbols.ArrowBack, "退出搜索")
-                            } else Icon(AppSymbols.Search, null)
-                        },
-                        trailingIcon = if (isInputFocused) {{
-                            IconButton(onClick = { onQueryChange("") }, enabled = searchQuery.isNotEmpty()) {
-                                Icon(AppSymbols.Close, "清空输入")
-                            }
-                        }} else if (searchQuery.isNotEmpty()) {{
-                            IconButton(onClick = search) { Icon(AppSymbols.ArrowForward, "查询") }
-                        }} else null,
-                        shape = CircleShape, singleLine = true,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { search() })
-                    )
-                    if (isInputFocused && suggestions.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                            suggestions.take(6).forEach { word ->
-                                Surface(onClick = { focus.clearFocus(); onHistoryClick(word) }, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                                    ListItem(headlineContent = { Text(word) }, trailingContent = { Icon(AppSymbols.ChevronRight, null) },
-                                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
+                    // A full-height scroll target lets a downward drag open search from anywhere
+                    // on the wallpaper without placing an input field over the image.
+                    Spacer(Modifier.height(viewportHeight))
+                }
+                if (searchOpen || isInputFocused) {
+                    Column(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 72.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (suggestions.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().heightIn(max = suggestionMaxHeight),
+                                shape = RoundedCornerShape(20.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                            ) {
+                                LazyColumn {
+                                    items(suggestions.take(8)) { word ->
+                                        Surface(onClick = { focus.clearFocus(); onHistoryClick(word) },
+                                            color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                                            ListItem(headlineContent = { Text(word) },
+                                                trailingContent = { Icon(AppSymbols.ChevronRight, null) },
+                                                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
+                                        }
+                                    }
                                 }
                             }
                         }
-                    } else if (!isInputFocused && homeSubtitle.isNotBlank()) {
-                        Spacer(Modifier.height(16.dp))
-                        Text(homeSubtitle, style = MaterialTheme.typography.bodyMedium, color = mutedColor)
                     }
-                    Spacer(Modifier.height(24.dp))
                 }
-                if (pullOffset > 1f && !isInputFocused) {
+                if (searchOpen || isInputFocused) TextField(
+                    value = searchQuery, onValueChange = onQueryChange,
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                        .heightIn(min = 56.dp)
+                        .focusRequester(requester).onFocusChanged {
+                            if (it.isFocused) {
+                                inputEverFocused = true
+                                onFocusChange(true)
+                            } else if (inputEverFocused) {
+                                inputEverFocused = false
+                                onFocusChange(false)
+                                searchOpen = false
+                            }
+                        },
+                    placeholder = { Text("单词、中文释义或一段文字", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = { IconButton(onClick = exitSearch) { Icon(AppSymbols.ArrowBack, "退出搜索") } },
+                    trailingIcon = {
+                        IconButton(onClick = { onQueryChange("") }, enabled = searchQuery.isNotEmpty()) {
+                            Icon(AppSymbols.Close, "清空输入")
+                        }
+                    },
+                    shape = CircleShape, singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        focusedIndicatorColor = MaterialTheme.colorScheme.surface.copy(alpha = 0f),
+                        unfocusedIndicatorColor = MaterialTheme.colorScheme.surface.copy(alpha = 0f)),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { search() })
+                )
+                if (pullOffset > 1f && !searchOpen && !isInputFocused) {
                     Row(
                         Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -221,10 +232,30 @@ fun HomeView(
                         )
                     }
                 }
-                FilledIconButton(
-                    onClick = { focus.clearFocus(); recentOpen = true },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).size(56.dp)
-                ) { Icon(AppSymbols.Schedule, "最近查阅", Modifier.size(24.dp)) }
+                if (!searchOpen && !isInputFocused) Row(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    FilledTonalIconButton(
+                        onClick = { onFocusChange(true); searchOpen = true }, modifier = Modifier.size(56.dp),
+                        colors = if (onWallpaper) IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = wallpaperForeground.copy(alpha = 0.22f),
+                            contentColor = wallpaperForeground
+                        ) else IconButtonDefaults.filledTonalIconButtonColors()
+                    ) { Icon(AppSymbols.Search, "打开下拉搜索", Modifier.size(28.dp)) }
+                    Column(Modifier.weight(1f)) {
+                        Text(homeTitle.ifBlank { "茶词" }, style = MaterialTheme.typography.titleLarge,
+                            color = strongColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (homeSubtitle.isNotBlank()) Text(homeSubtitle,
+                            style = MaterialTheme.typography.bodySmall, color = mutedColor,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    FilledIconButton(
+                        onClick = { focus.clearFocus(); recentOpen = true }, modifier = Modifier.size(56.dp)
+                    ) { Icon(AppSymbols.Schedule, "最近查阅", Modifier.size(24.dp)) }
+                }
             }
         }
     }

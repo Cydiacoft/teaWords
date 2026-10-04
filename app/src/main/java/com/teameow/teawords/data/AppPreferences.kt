@@ -12,6 +12,12 @@ enum class SubtitleMode {
     HITOKOTO
 }
 
+enum class HomeWallpaperMode(val label: String) {
+    NONE("纯色背景"),
+    DAILY("每日壁纸"),
+    CUSTOM("自定义壁纸")
+}
+
 /** Appearance preference. SYSTEM follows the device; the other two pin the app. */
 enum class AppThemeMode(val label: String) {
     SYSTEM("跟随系统"),
@@ -113,6 +119,21 @@ class AppPreferences(context: Context) {
             prefs.edit().putBoolean(KEY_BING_WALLPAPER_ENABLED, value).apply()
         }
 
+    var homeWallpaperMode: HomeWallpaperMode
+        get() = prefs.getString(KEY_HOME_WALLPAPER_MODE, null)
+            ?.let { saved -> HomeWallpaperMode.entries.firstOrNull { it.name == saved } }
+            ?: if (bingWallpaperEnabled) HomeWallpaperMode.DAILY else HomeWallpaperMode.NONE
+        set(value) {
+            prefs.edit()
+                .putString(KEY_HOME_WALLPAPER_MODE, value.name)
+                .putBoolean(KEY_BING_WALLPAPER_ENABLED, value == HomeWallpaperMode.DAILY)
+                .apply()
+        }
+
+    var customWallpaperUri: String?
+        get() = prefs.getString(KEY_CUSTOM_WALLPAPER_URI, null)
+        set(value) { prefs.edit().putString(KEY_CUSTOM_WALLPAPER_URI, value).apply() }
+
     var themeMode: AppThemeMode
         get() = AppThemeMode.values().getOrElse(
             prefs.getInt(KEY_THEME_MODE, AppThemeMode.SYSTEM.ordinal)
@@ -163,6 +184,8 @@ class AppPreferences(context: Context) {
         private const val KEY_HOME_LAST_CLEARED = "home_last_cleared"
         private const val KEY_HITOKOTO_REFRESH_INTERVAL = "hitokoto_refresh_interval"
         private const val KEY_BING_WALLPAPER_ENABLED = "bing_wallpaper_enabled"
+        private const val KEY_HOME_WALLPAPER_MODE = "home_wallpaper_mode"
+        private const val KEY_CUSTOM_WALLPAPER_URI = "custom_wallpaper_uri"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_PREDICTIVE_BACK = "predictive_back_enabled"

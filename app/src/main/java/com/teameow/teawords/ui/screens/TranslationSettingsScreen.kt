@@ -48,7 +48,8 @@ internal fun TranslationSettingsPage(onBack: () -> Unit) {
             finally { checking = false }
         }
     }
-    TeaListPage(title = "句子与长文翻译", subtitle = "选择翻译方式，设置好再保存", onBack = onBack, backEnabled = !busy) {
+    TeaListPage(title = "句子与长文翻译", containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        subtitle = "选择翻译方式，设置好再保存", onBack = onBack, backEnabled = !busy) {
         item {
             TeaCard {
             TranslationEngine.entries.forEach { choice ->

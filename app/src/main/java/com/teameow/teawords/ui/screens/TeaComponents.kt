@@ -45,6 +45,7 @@ internal val LocalReservedBottom = staticCompositionLocalOf<Dp?> { null }
 fun TeaListPage(
     title: String,
     modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.background,
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
     backEnabled: Boolean = true,
@@ -74,7 +75,7 @@ fun TeaListPage(
                 if (reservedBottom == null) Modifier.navigationBarsPadding()
                 else Modifier.padding(bottom = reservedBottom)
             )
-            .background(MaterialTheme.colorScheme.background)
+            .background(containerColor)
     ) {
         TopAppBar(
             title = {
@@ -98,7 +99,7 @@ fun TeaListPage(
             },
             actions = actions,
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.background,
+                containerColor = containerColor,
                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                 navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant

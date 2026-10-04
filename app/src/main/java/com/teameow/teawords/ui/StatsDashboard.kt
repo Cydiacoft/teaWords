@@ -124,7 +124,13 @@ fun StatsDashboard(dbHelper: DatabaseHelper, modifier: Modifier = Modifier, onBa
         title = "词汇知识画像",
         subtitle = "实测证据与模型预测分开统计",
         modifier = modifier,
-        onBack = onBack
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        navigationContent = {},
+        actions = {
+            FilledTonalIconButton(onClick = onBack, modifier = Modifier.size(56.dp)) {
+                Icon(AppSymbols.Close, "关闭统计")
+            }
+        }
     ) {
         if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         error?.let { item { TeaCaption(it) } }
